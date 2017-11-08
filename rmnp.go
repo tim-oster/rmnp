@@ -36,7 +36,7 @@ func (impl *protocolImpl) listen() {
 		// TODO handle in go-routine?
 		packet := buffer[:length]
 
-		if !validatePacketBytes(packet) {
+		if !validateHeader(packet) {
 			fmt.Println("error during sending")
 			//return
 			continue
@@ -62,7 +62,7 @@ func (impl *protocolImpl) retrieveConnection(addr *net.UDPAddr) *Connection {
 			addr:           addr,
 			localSequence:  1,
 			remoteSequence: 0,
-			sendMap:        make(map[byte]*sendPacket),
+			sendMap:        make(map[sequenceNumber]*sendPacket),
 			recvBuffer:     NewSequenceBuffer(SequenceBufferSize),
 		}
 		impl.connections[hash] = connection

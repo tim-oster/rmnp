@@ -38,6 +38,6 @@ func (c *Client) Disconnect() {
 func (c *Client) Send() {
 	for {
 		c.server.sendPacket(&Packet{descriptor: Reliable}, false)
-		time.Sleep(600 * time.Millisecond)
+		time.Sleep(60 * time.Millisecond)
 	}
 }

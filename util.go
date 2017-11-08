@@ -27,20 +27,16 @@ func currentTime() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
-/*func greaterThan(s1 uint16, s2 uint16) bool {
+func greaterThan(s1, s2 sequenceNumber) bool {
 	return (s1 > s2 && s1 - s2 <= 32768) || (s1 < s2 && s2 - s1 > 32768)
-}*/
-
-func greaterThan(s1 byte, s2 byte) bool {
-	return ((s1 > s2) && (s1-s2 <= 128)) || ((s1 < s2) && (s2-s1 > 128))
 }
 
-func difference(s1 byte, s2 byte) byte {
+func difference(s1, s2 sequenceNumber) sequenceNumber {
 	if s1 >= s2 {
-		if s1-s2 <= 128 {
+		if s1-s2 <= 32768 {
 			return s1 - s2
 		} else {
-			return (255 - s1) + s2
+			return (65535 - s1) + s2
 		}
 	} else {
 		return difference(s2, s1)

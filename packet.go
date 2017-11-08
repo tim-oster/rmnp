@@ -9,6 +9,7 @@ import (
 	"hash/crc32"
 )
 
+type sequenceNumber uint16
 type descriptor byte
 
 const (
@@ -22,10 +23,10 @@ type Packet struct {
 	descriptor descriptor
 
 	// only contained in Reliable packets
-	sequence byte
+	sequence sequenceNumber
 
 	// only contained in Ack packets
-	ack     byte
+	ack     sequenceNumber
 	ackBits uint32
 }
 
@@ -81,7 +82,7 @@ func (p *Packet) CalculateHash() {
 	p.crc32 = crc32.ChecksumIEEE(buffer)
 }
 
-func validatePacketBytes(packet []byte) bool {
+func validateHeader(packet []byte) bool {
 	// 1b protocolId + 4b crc32 + 1b descriptor
 	if len(packet) < 6 {
 		return false

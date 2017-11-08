@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type packetKeys []byte
+type packetKeys []sequenceNumber
 
 func (a packetKeys) Len() int           { return len(a) }
 func (a packetKeys) Less(i, j int) bool { return a[i] < a[j] }
@@ -28,14 +28,14 @@ type Connection struct {
 	conn     *net.UDPConn
 	addr     *net.UDPAddr
 
-	localSequence  byte
-	remoteSequence byte
+	localSequence  sequenceNumber
+	remoteSequence sequenceNumber
 	ackBits        uint32
 
 	lastSendTime   int64
 	lastResendTime int64
 	sendMapMutex   sync.Mutex
-	sendMap        map[byte]*sendPacket // TODO use other data structure?
+	sendMap        map[sequenceNumber]*sendPacket // TODO use other data structure?
 	recvBuffer     *SequenceBuffer
 }
 
@@ -48,7 +48,7 @@ func (c *Connection) update() {
 
 			c.sendMapMutex.Lock()
 
-			keys := make([]byte, 0)
+			keys := make([]sequenceNumber, 0)
 			for key := range c.sendMap {
 				keys = append(keys, key)
 			}
@@ -113,8 +113,8 @@ func (c *Connection) handleReliablePacket(packet *Packet) {
 
 	// update ack bit mask for last 32 packets
 	c.ackBits = 0
-	for i := uint(1); i <= 32; i++ {
-		if c.recvBuffer.Get(c.remoteSequence - byte(i)) {
+	for i := sequenceNumber(1); i <= 32; i++ {
+		if c.recvBuffer.Get(c.remoteSequence - i) {
 			c.ackBits |= 1 << (i - 1)
 		}
 	}
@@ -123,7 +123,7 @@ func (c *Connection) handleReliablePacket(packet *Packet) {
 }
 
 func (c *Connection) handleAckPacket(packet *Packet) {
-	for i := byte(0); i <= 32; i++ {
+	for i := sequenceNumber(0); i <= 32; i++ {
 		if i == 0 || packet.ackBits&(1<<(i-1)) != 0 {
 			key := packet.ack - i
 

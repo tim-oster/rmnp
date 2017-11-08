@@ -11,7 +11,7 @@ const (
 	MaxSkippedPackets = 25
 
 	// size needs to ensure that every slot in buffers is at least overwritten 2 times, otherwise acks will fail (max_sequence % size > 32 && max_sequence / size >= 2)
-	SequenceBufferSize = 100
+	SequenceBufferSize = 200
 
 	UpdateLoopTimeout = 10
 	ReackTimeout      = 50

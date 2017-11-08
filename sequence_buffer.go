@@ -5,20 +5,20 @@
 package rmnp
 
 type SequenceBuffer struct {
-	size      byte
-	sequences []byte
+	size      sequenceNumber
+	sequences []sequenceNumber
 	states    []bool
 }
 
-func NewSequenceBuffer(size byte) *SequenceBuffer {
+func NewSequenceBuffer(size sequenceNumber) *SequenceBuffer {
 	buffer := new(SequenceBuffer)
 	buffer.size = size
-	buffer.sequences = make([]byte, size)
+	buffer.sequences = make([]sequenceNumber, size)
 	buffer.states = make([]bool, size)
 	return buffer
 }
 
-func (buffer *SequenceBuffer) Get(sequence byte) bool {
+func (buffer *SequenceBuffer) Get(sequence sequenceNumber) bool {
 	if sequence < 0 {
 		sequence += buffer.size
 	}
@@ -30,7 +30,7 @@ func (buffer *SequenceBuffer) Get(sequence byte) bool {
 	return buffer.states[sequence%buffer.size]
 }
 
-func (buffer *SequenceBuffer) Set(sequence byte, value bool) {
+func (buffer *SequenceBuffer) Set(sequence sequenceNumber, value bool) {
 	if sequence < 0 {
 		sequence += buffer.size
 	}
