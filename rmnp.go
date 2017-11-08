@@ -32,20 +32,19 @@ func (impl *protocolImpl) listen() {
 		// TODO pool?
 		buffer := make([]byte, MTU)
 		length, addr, _ := impl.socket.ReadFromUDP(buffer)
-		go impl.handleUDP(buffer, length, addr)
+
+		// TODO handle in go-routine?
+		packet := buffer[:length]
+
+		if !validatePacketBytes(packet) {
+			fmt.Println("error during sending")
+			//return
+			continue
+		}
+
+		connection := impl.retrieveConnection(addr)
+		go connection.handlePacket(packet)
 	}
-}
-
-func (impl *protocolImpl) handleUDP(buffer []byte, length int, addr *net.UDPAddr) {
-	packet := buffer[:length]
-
-	if !validatePacketBytes(packet) {
-		fmt.Println("error during sending")
-		return
-	}
-
-	connection := impl.retrieveConnection(addr)
-	connection.handlePacket(packet)
 }
 
 func (impl *protocolImpl) retrieveConnection(addr *net.UDPAddr) *Connection {

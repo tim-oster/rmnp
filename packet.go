@@ -92,6 +92,6 @@ func validatePacketBytes(packet []byte) bool {
 	}
 
 	hash1 := binary.BigEndian.Uint32(packet[1:5])
-	hash2 := crc32.ChecksumIEEE(append([]byte{packet[0]}, packet[5:]...))
+	hash2 := crc32.ChecksumIEEE(append([]byte{packet[0], 0, 0, 0, 0}, packet[5:]...))
 	return hash1 == hash2
 }

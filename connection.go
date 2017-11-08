@@ -12,6 +12,12 @@ import (
 	"time"
 )
 
+type packetKeys []byte
+
+func (a packetKeys) Len() int           { return len(a) }
+func (a packetKeys) Less(i, j int) bool { return a[i] < a[j] }
+func (a packetKeys) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
 type sendPacket struct {
 	packet   *Packet
 	sendTime int64
@@ -42,17 +48,17 @@ func (c *Connection) update() {
 
 			c.sendMapMutex.Lock()
 
-			keys := make([]int, 0)
+			keys := make([]byte, 0)
 			for key := range c.sendMap {
-				keys = append(keys, int(key))
+				keys = append(keys, key)
 			}
-			sort.Ints(keys)
+			sort.Sort(packetKeys(keys))
 
 			for _, key := range keys {
-				packet := c.sendMap[byte(key)]
+				packet := c.sendMap[key]
 
 				if currentTime-packet.sendTime > SendRemoveTimeout {
-					delete(c.sendMap, byte(key))
+					delete(c.sendMap, key)
 				} else {
 					c.sendPacket(packet.packet, true)
 				}
@@ -117,9 +123,9 @@ func (c *Connection) handleReliablePacket(packet *Packet) {
 }
 
 func (c *Connection) handleAckPacket(packet *Packet) {
-	for i := uint(0); i <= 32; i++ {
+	for i := byte(0); i <= 32; i++ {
 		if i == 0 || packet.ackBits&(1<<(i-1)) != 0 {
-			key := packet.ack - byte(i)
+			key := packet.ack - i
 
 			c.sendMapMutex.Lock()
 			if _, ok := c.sendMap[key]; ok {
@@ -132,13 +138,6 @@ func (c *Connection) handleAckPacket(packet *Packet) {
 }
 
 func (c *Connection) sendPacket(packet *Packet, resend bool) {
-	fmt.Print("send sequences #", packet.sequence)
-	if resend {
-		fmt.Println(" resend")
-	} else {
-		fmt.Println()
-	}
-
 	packet.protocolId = ProtocolId
 
 	if packet.descriptor&Reliable != 0 && !resend {
@@ -158,6 +157,15 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 		packet.ackBits = c.ackBits
 	}
 
+	if packet.sequence > 0 {
+		fmt.Print("send sequences #", packet.sequence)
+		if resend {
+			fmt.Println(" resend")
+		} else {
+			fmt.Println()
+		}
+	}
+
 	packet.CalculateHash()
 	buffer := packet.Serialize()
 	c.protocol.writerFunc(c, buffer)
@@ -166,6 +174,5 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 }
 
 func (c *Connection) sendAckPacket() {
-	fmt.Print("ack: ")
 	c.sendPacket(&Packet{descriptor: Ack}, false)
 }
