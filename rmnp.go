@@ -11,33 +11,36 @@ import (
 	"time"
 )
 
+type ReadFunc func(*net.UDPConn, []byte) (int, *net.UDPAddr, bool)
+type WriteFunc func(*Connection, []byte)
+
 type protocolImpl struct {
 	address *net.UDPAddr
 	socket  *net.UDPConn
 
 	connections map[uint16]*Connection
-	writerFunc  func(*Connection, []byte)
+	readFunc    ReadFunc
+	writeFunc   WriteFunc
 }
 
-func (impl *protocolImpl) init(address string, writerFunc func(*Connection, []byte)) {
+func (impl *protocolImpl) init(address string) {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	checkError("Failed to resolve udp address", err)
 	impl.address = addr
 
 	impl.connections = make(map[uint16]*Connection)
-	impl.writerFunc = writerFunc
 }
-
-var count = 0
 
 func (impl *protocolImpl) listen() {
 	for {
 		// TODO pool?
 		buffer := make([]byte, MTU)
-		length, addr, _ := impl.socket.ReadFromUDP(buffer)
 
-		count++
-		fmt.Println("received #", count)
+		length, addr, next := impl.readFunc(impl.socket, buffer)
+
+		if !next {
+			continue
+		}
 
 		// TODO handle in go-routine?
 		packet := buffer[:length]

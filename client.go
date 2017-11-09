@@ -17,9 +17,22 @@ type Client struct {
 
 func NewClient(server string) *Client {
 	c := new(Client)
-	c.protocolImpl.init(server, func(c *Connection, buffer []byte) {
+
+	c.protocolImpl.readFunc = func(conn *net.UDPConn, buffer []byte) (int, *net.UDPAddr, bool) {
+		length, err := conn.Read(buffer)
+
+		if err != nil{
+			return 0, nil, false
+		}
+
+		return length, c.server.addr, true
+	}
+
+	c.protocolImpl.writeFunc = func(c *Connection, buffer []byte) {
 		c.conn.Write(buffer)
-	})
+	}
+
+	c.protocolImpl.init(server)
 	return c
 }
 

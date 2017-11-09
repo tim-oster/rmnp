@@ -168,7 +168,7 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 
 	packet.CalculateHash()
 	buffer := packet.Serialize()
-	c.protocol.writerFunc(c, buffer)
+	c.protocol.writeFunc(c, buffer)
 
 	c.lastSendTime = currentTime()
 }

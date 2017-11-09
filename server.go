@@ -12,9 +12,22 @@ type Server struct {
 
 func NewServer(address string) *Server {
 	s := new(Server)
-	s.protocolImpl.init(address, func(c *Connection, buffer []byte) {
+
+	s.protocolImpl.readFunc = func(conn *net.UDPConn, buffer []byte) (int, *net.UDPAddr, bool) {
+		length, addr, err := conn.ReadFromUDP(buffer)
+
+		if err != nil{
+			return 0, nil, false
+		}
+
+		return length, addr, true
+	}
+
+	s.protocolImpl.writeFunc = func(c *Connection, buffer []byte) {
 		c.conn.WriteToUDP(buffer, c.addr)
-	})
+	}
+
+	s.protocolImpl.init(address)
 	return s
 }
 
