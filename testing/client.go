@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/obsilp/rmnp"
 	"fmt"
+	"time"
 )
 
 func main() {
@@ -10,10 +11,9 @@ func main() {
 	client := rmnp.NewClient("127.0.0.1:10001")
 	client.Connect()
 
-	//client.Send()
+	client.Send()
 
 	for {
-		i := 0
-		_ = i
+		time.Sleep(1 * time.Second)
 	}
 }

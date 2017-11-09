@@ -78,11 +78,11 @@ func (impl *protocolImpl) retrieveConnection(addr *net.UDPAddr) *Connection {
 
 		go connection.update()
 
-		if addr.Port != 10001 {
+		if addr.Port != 10001 && false {
 			go func() {
 				for {
 					connection.sendPacket(&Packet{descriptor: Reliable}, false)
-					time.Sleep(20 * time.Millisecond)
+					time.Sleep(500 * time.Millisecond)
 				}
 			}()
 		}
