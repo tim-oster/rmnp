@@ -96,7 +96,7 @@ func (c *Connection) handlePacket(packet []byte) {
 }
 
 func (c *Connection) handleReliablePacket(packet *Packet) {
-	fmt.Println("recveived sequences #", packet.sequence)
+	//fmt.Println("recveived sequences #", packet.sequence)
 
 	if c.recvBuffer.Get(packet.sequence) {
 		fmt.Println(":: was duplicate")

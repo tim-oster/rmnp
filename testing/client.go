@@ -10,7 +10,7 @@ func main() {
 	client := rmnp.NewClient("127.0.0.1:10001")
 	client.Connect()
 
-	client.Send()
+	//client.Send()
 
 	for {
 		i := 0

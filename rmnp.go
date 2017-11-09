@@ -8,6 +8,7 @@ import (
 	"net"
 	"fmt"
 	"github.com/joaojeronimo/go-crc16"
+	"time"
 )
 
 type protocolImpl struct {
@@ -27,11 +28,16 @@ func (impl *protocolImpl) init(address string, writerFunc func(*Connection, []by
 	impl.writerFunc = writerFunc
 }
 
+var count = 0
+
 func (impl *protocolImpl) listen() {
 	for {
 		// TODO pool?
 		buffer := make([]byte, MTU)
 		length, addr, _ := impl.socket.ReadFromUDP(buffer)
+
+		count++
+		fmt.Println("received #", count)
 
 		// TODO handle in go-routine?
 		packet := buffer[:length]
@@ -68,6 +74,15 @@ func (impl *protocolImpl) retrieveConnection(addr *net.UDPAddr) *Connection {
 		impl.connections[hash] = connection
 
 		go connection.update()
+
+		if addr.Port != 10001 {
+			go func() {
+				for {
+					connection.sendPacket(&Packet{descriptor: Reliable}, false)
+					time.Sleep(20 * time.Millisecond)
+				}
+			}()
+		}
 	}
 
 	return connection
