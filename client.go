@@ -21,7 +21,7 @@ func NewClient(server string) *Client {
 	c.protocolImpl.readFunc = func(conn *net.UDPConn, buffer []byte) (int, *net.UDPAddr, bool) {
 		length, err := conn.Read(buffer)
 
-		if err != nil{
+		if err != nil {
 			return 0, nil, false
 		}
 
@@ -50,7 +50,7 @@ func (c *Client) Disconnect() {
 
 func (c *Client) Send() {
 	for {
-		c.server.sendPacket(&Packet{descriptor: Ordered}, false)
-		time.Sleep(500 * time.Millisecond)
+		c.server.sendPacket(&Packet{descriptor: Reliable | Ordered}, false)
+		time.Sleep(100 * time.Millisecond)
 	}
 }

@@ -28,14 +28,16 @@ type Connection struct {
 	conn     *net.UDPConn
 	addr     *net.UDPAddr
 
-	// for reliable packets
-	localSequence  sequenceNumber
-	remoteSequence sequenceNumber
-	ackBits        uint32
+	// for Reliable packets
+	localSequence   sequenceNumber
+	remoteSequence  sequenceNumber
+	ackBits         uint32
+	orderedChain    *packetChain
+	orderedSequence orderNumber
 
-	// for unreliable packets
-	localOrderedSequence  sequenceNumber
-	remoteOrderedSequence sequenceNumber
+	// for Unreliable Ordered packets
+	localUnreliableSequence  sequenceNumber
+	remoteUnreliableSequence sequenceNumber
 
 	lastSendTime   int64
 	lastResendTime int64
@@ -93,11 +95,11 @@ func (c *Connection) handlePacket(packet []byte) {
 		return
 	}
 
-	if p.Flag(Ordered) && !c.handleOrderedPacket(p) {
+	if p.Flag(Ack) && !c.handleAckPacket(p) {
 		return
 	}
 
-	if p.Flag(Ack) && !c.handleAckPacket(p) {
+	if p.Flag(Ordered) && !c.handleOrderedPacket(p) {
 		return
 	}
 
@@ -116,7 +118,7 @@ func (c *Connection) handleReliablePacket(packet *Packet) bool {
 	c.recvBuffer.Set(packet.sequence, true)
 
 	// update remote sequences number
-	if greaterThan(packet.sequence, c.remoteSequence) && difference(packet.sequence, c.remoteSequence) <= MaxSkippedPackets {
+	if greaterThanSequence(packet.sequence, c.remoteSequence) && differenceSequence(packet.sequence, c.remoteSequence) <= MaxSkippedPackets {
 		c.remoteSequence = packet.sequence
 	}
 
@@ -135,10 +137,13 @@ func (c *Connection) handleReliablePacket(packet *Packet) bool {
 
 func (c *Connection) handleOrderedPacket(packet *Packet) bool {
 	if packet.Flag(Reliable) {
-		// TODO implement
+		c.orderedChain.Chain(packet)
+		for _ := range c.orderedChain.PopConsecutive() {
+			// TODO process
+		}
 	} else {
-		if greaterThan(packet.sequence, c.remoteOrderedSequence) {
-			c.remoteOrderedSequence = packet.sequence
+		if greaterThanSequence(packet.sequence, c.remoteUnreliableSequence) {
+			c.remoteUnreliableSequence = packet.sequence
 			return true
 		}
 	}
@@ -171,6 +176,11 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 			packet.sequence = c.localSequence
 			c.localSequence++
 
+			if packet.Flag(Ordered) {
+				packet.order = c.orderedSequence
+				c.orderedSequence++
+			}
+
 			c.sendMapMutex.Lock()
 			c.sendMap[packet.sequence] = &sendPacket{
 				packet:   packet,
@@ -178,8 +188,8 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 			}
 			c.sendMapMutex.Unlock()
 		} else if packet.Flag(Ordered) {
-			packet.sequence = c.localOrderedSequence
-			c.localOrderedSequence++
+			packet.sequence = c.localUnreliableSequence
+			c.localUnreliableSequence++
 		}
 	}
 

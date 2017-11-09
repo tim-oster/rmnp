@@ -66,13 +66,12 @@ func (impl *protocolImpl) retrieveConnection(addr *net.UDPAddr) *Connection {
 
 		// TODO pool?
 		connection = &Connection{
-			protocol:       impl,
-			conn:           impl.socket,
-			addr:           addr,
-			localSequence:  1,
-			remoteSequence: 0,
-			sendMap:        make(map[sequenceNumber]*sendPacket),
-			recvBuffer:     NewSequenceBuffer(SequenceBufferSize),
+			protocol:     impl,
+			conn:         impl.socket,
+			addr:         addr,
+			orderedChain: NewPacketChain(),
+			sendMap:      make(map[sequenceNumber]*sendPacket),
+			recvBuffer:   NewSequenceBuffer(SequenceBufferSize),
 		}
 		impl.connections[hash] = connection
 
@@ -81,8 +80,8 @@ func (impl *protocolImpl) retrieveConnection(addr *net.UDPAddr) *Connection {
 		if addr.Port != 10001 && false {
 			go func() {
 				for {
-					connection.sendPacket(&Packet{descriptor: Reliable}, false)
-					time.Sleep(500 * time.Millisecond)
+					connection.sendPacket(&Packet{descriptor: Reliable | Ordered}, false)
+					time.Sleep(100 * time.Millisecond)
 				}
 			}()
 		}

@@ -10,6 +10,7 @@ import (
 )
 
 type sequenceNumber uint16
+type orderNumber uint8
 type descriptor byte
 
 const (
@@ -23,8 +24,11 @@ type Packet struct {
 	crc32      uint32
 	descriptor descriptor
 
-	// only contained in Reliable packets
+	// only contained in Reliable or Unreliable Ordered packets
 	sequence sequenceNumber
+
+	// only for Reliable Ordered packets
+	order orderNumber
 
 	// only contained in Ack packets
 	ack     sequenceNumber
@@ -41,6 +45,10 @@ func (p *Packet) Serialize() []byte {
 
 	if p.Flag(Reliable) || p.Flag(Ordered) {
 		s.Write(p.sequence)
+	}
+
+	if p.Flag(Reliable) && p.Flag(Ordered) {
+		s.Write(p.order)
 	}
 
 	if p.Flag(Ack) {
@@ -65,10 +73,17 @@ func (p *Packet) Deserialize(packet []byte) bool {
 		}
 	}
 
+	if p.Flag(Reliable) && p.Flag(Ordered) {
+		if s.Read(&p.order) != nil {
+			return false
+		}
+	}
+
 	if p.Flag(Ack) {
 		if s.Read(&p.ack) != nil {
 			return false
 		}
+
 		if s.Read(&p.ackBits) != nil {
 			return false
 		}
