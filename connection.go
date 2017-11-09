@@ -138,9 +138,13 @@ func (c *Connection) handleReliablePacket(packet *Packet) bool {
 func (c *Connection) handleOrderedPacket(packet *Packet) bool {
 	if packet.Flag(Reliable) {
 		c.orderedChain.Chain(packet)
-		for _ := range c.orderedChain.PopConsecutive() {
+
+		// tmp
+		c.orderedChain.PopConsecutive()
+
+		/*for _, p := range c.orderedChain.PopConsecutive() {
 			// TODO process
-		}
+		}*/
 	} else {
 		if greaterThanSequence(packet.sequence, c.remoteUnreliableSequence) {
 			c.remoteUnreliableSequence = packet.sequence
