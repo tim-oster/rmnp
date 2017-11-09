@@ -28,9 +28,14 @@ type Connection struct {
 	conn     *net.UDPConn
 	addr     *net.UDPAddr
 
+	// for reliable packets
 	localSequence  sequenceNumber
 	remoteSequence sequenceNumber
 	ackBits        uint32
+
+	// for unreliable packets
+	localOrderedSequence  sequenceNumber
+	remoteOrderedSequence sequenceNumber
 
 	lastSendTime   int64
 	lastResendTime int64
@@ -84,23 +89,27 @@ func (c *Connection) handlePacket(packet []byte) {
 		return
 	}
 
-	if p.descriptor&Reliable != 0 {
-		c.handleReliablePacket(p)
+	if p.Flag(Reliable) && !c.handleReliablePacket(p) {
+		return
 	}
 
-	if p.descriptor&Ack != 0 {
-		c.handleAckPacket(p)
+	if p.Flag(Ordered) && !c.handleOrderedPacket(p) {
+		return
+	}
+
+	if p.Flag(Ack) && !c.handleAckPacket(p) {
+		return
 	}
 
 	// TODO process
 }
 
-func (c *Connection) handleReliablePacket(packet *Packet) {
+func (c *Connection) handleReliablePacket(packet *Packet) bool {
 	fmt.Println("recveived sequences #", packet.sequence)
 
 	if c.recvBuffer.Get(packet.sequence) {
 		fmt.Println(":: was duplicate")
-		return
+		return false
 	}
 
 	// update receive states
@@ -120,9 +129,24 @@ func (c *Connection) handleReliablePacket(packet *Packet) {
 	}
 
 	c.sendAckPacket()
+
+	return true
 }
 
-func (c *Connection) handleAckPacket(packet *Packet) {
+func (c *Connection) handleOrderedPacket(packet *Packet) bool {
+	if packet.Flag(Reliable) {
+		// TODO implement
+	} else {
+		if greaterThan(packet.sequence, c.remoteOrderedSequence) {
+			c.remoteOrderedSequence = packet.sequence
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *Connection) handleAckPacket(packet *Packet) bool {
 	for i := sequenceNumber(0); i <= 32; i++ {
 		if i == 0 || packet.ackBits&(1<<(i-1)) != 0 {
 			key := packet.ack - i
@@ -135,24 +159,31 @@ func (c *Connection) handleAckPacket(packet *Packet) {
 			c.sendMapMutex.Unlock()
 		}
 	}
+
+	return true
 }
 
 func (c *Connection) sendPacket(packet *Packet, resend bool) {
 	packet.protocolId = ProtocolId
 
-	if packet.descriptor&Reliable != 0 && !resend {
-		packet.sequence = c.localSequence
-		c.localSequence++
+	if !resend {
+		if packet.Flag(Reliable) {
+			packet.sequence = c.localSequence
+			c.localSequence++
 
-		c.sendMapMutex.Lock()
-		c.sendMap[packet.sequence] = &sendPacket{
-			packet:   packet,
-			sendTime: currentTime(),
+			c.sendMapMutex.Lock()
+			c.sendMap[packet.sequence] = &sendPacket{
+				packet:   packet,
+				sendTime: currentTime(),
+			}
+			c.sendMapMutex.Unlock()
+		} else if packet.Flag(Ordered) {
+			packet.sequence = c.localOrderedSequence
+			c.localOrderedSequence++
 		}
-		c.sendMapMutex.Unlock()
 	}
 
-	if packet.descriptor&Ack != 0 {
+	if packet.Flag(Ack) {
 		packet.ack = c.remoteSequence
 		packet.ackBits = c.ackBits
 	}

@@ -50,7 +50,7 @@ func (c *Client) Disconnect() {
 
 func (c *Client) Send() {
 	for {
-		c.server.sendPacket(&Packet{descriptor: Reliable}, false)
-		time.Sleep(60 * time.Millisecond)
+		c.server.sendPacket(&Packet{descriptor: Ordered}, false)
+		time.Sleep(500 * time.Millisecond)
 	}
 }

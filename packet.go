@@ -15,6 +15,7 @@ type descriptor byte
 const (
 	Reliable descriptor = 1 << iota
 	Ack
+	Ordered
 )
 
 type Packet struct {
@@ -38,11 +39,11 @@ func (p *Packet) Serialize() []byte {
 	s.Write(p.crc32)
 	s.Write(p.descriptor)
 
-	if p.descriptor&Reliable != 0 {
+	if p.Flag(Reliable) || p.Flag(Ordered) {
 		s.Write(p.sequence)
 	}
 
-	if p.descriptor&Ack != 0 {
+	if p.Flag(Ack) {
 		s.Write(p.ack)
 		s.Write(p.ackBits)
 	}
@@ -58,13 +59,13 @@ func (p *Packet) Deserialize(packet []byte) bool {
 	s.Read(&p.crc32)
 	s.Read(&p.descriptor)
 
-	if p.descriptor&Reliable != 0 {
+	if p.Flag(Reliable) || p.Flag(Ordered) {
 		if s.Read(&p.sequence) != nil {
 			return false
 		}
 	}
 
-	if p.descriptor&Ack != 0 {
+	if p.Flag(Ack) {
 		if s.Read(&p.ack) != nil {
 			return false
 		}
@@ -80,6 +81,10 @@ func (p *Packet) CalculateHash() {
 	p.crc32 = 0
 	buffer := p.Serialize()
 	p.crc32 = crc32.ChecksumIEEE(buffer)
+}
+
+func (p *Packet) Flag(flag descriptor) bool {
+	return p.descriptor&flag != 0
 }
 
 func validateHeader(packet []byte) bool {
