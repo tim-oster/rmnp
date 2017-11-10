@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sort"
 	"time"
+	"context"
 )
 
 type packetKeys []sequenceNumber
@@ -27,6 +28,10 @@ type Connection struct {
 	protocol *protocolImpl
 	conn     *net.UDPConn
 	addr     *net.UDPAddr
+
+	// for go routines
+	ctx          context.Context
+	stopRoutines context.CancelFunc
 
 	// for Reliable packets
 	localSequence   sequenceNumber
@@ -46,8 +51,14 @@ type Connection struct {
 	recvBuffer     *SequenceBuffer
 }
 
-func (c *Connection) update() {
+func (c *Connection) update(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(UpdateLoopTimeout * time.Millisecond):
+		}
+
 		currentTime := currentTime()
 
 		if currentTime-c.lastResendTime > ResendTimeout {
@@ -77,8 +88,6 @@ func (c *Connection) update() {
 		if currentTime-c.lastSendTime > ReackTimeout {
 			c.sendAckPacket()
 		}
-
-		time.Sleep(UpdateLoopTimeout * time.Millisecond)
 	}
 }
 
@@ -202,7 +211,7 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 		packet.ackBits = c.ackBits
 	}
 
-	if packet.sequence > 0 {
+	if packet.Flag(Reliable) {
 		fmt.Print("send sequences #", packet.sequence)
 		if resend {
 			fmt.Println(" resend")
@@ -218,6 +227,10 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 	c.lastSendTime = currentTime()
 }
 
+func (c *Connection) sendLowLevelPacket(descriptor descriptor) {
+	c.sendPacket(&Packet{descriptor: descriptor}, false)
+}
+
 func (c *Connection) sendAckPacket() {
-	c.sendPacket(&Packet{descriptor: Ack}, false)
+	c.sendLowLevelPacket(Ack)
 }

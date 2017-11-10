@@ -11,7 +11,8 @@ func main() {
 	client := rmnp.NewClient("127.0.0.1:10001")
 	client.Connect()
 
-	client.Send()
+	time.Sleep(2 * time.Second)
+	client.Disconnect()
 
 	for {
 		time.Sleep(1 * time.Second)

@@ -8,6 +8,8 @@ import (
 	"encoding/binary"
 	"time"
 	"fmt"
+	"net"
+	"github.com/joaojeronimo/go-crc16"
 )
 
 func checkError(msg string, err error) {
@@ -15,6 +17,11 @@ func checkError(msg string, err error) {
 		fmt.Println(msg, "=>", err)
 		panic(err)
 	}
+}
+
+func addrHash(addr *net.UDPAddr) uint16 {
+	port := cnvUint32(uint32(addr.Port))
+	return crc16.Crc16(append(addr.IP, port...))
 }
 
 func cnvUint32(i uint32) []byte {

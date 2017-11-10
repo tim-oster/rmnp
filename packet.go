@@ -14,9 +14,14 @@ type orderNumber uint8
 type descriptor byte
 
 const (
+	// Send Flags
 	Reliable descriptor = 1 << iota
 	Ack
 	Ordered
+
+	// Basic Packet Types (only single use possible)
+	Connect
+	Disconnect
 )
 
 type Packet struct {

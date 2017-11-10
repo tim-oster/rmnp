@@ -6,7 +6,6 @@ package rmnp
 
 import (
 	"net"
-	"time"
 )
 
 type Client struct {
@@ -39,18 +38,15 @@ func NewClient(server string) *Client {
 func (c *Client) Connect() {
 	socket, err := net.DialUDP("udp", nil, c.address)
 	checkError("Cannot connect to server", err)
+
 	c.socket = socket
-	c.server = c.protocolImpl.retrieveConnection(socket.RemoteAddr().(*net.UDPAddr))
-	go c.protocolImpl.listen()
+	c.server = c.protocolImpl.connectClient(socket.RemoteAddr().(*net.UDPAddr))
+
+	c.protocolImpl.listen()
+	c.server.sendLowLevelPacket(Reliable | Connect)
 }
 
 func (c *Client) Disconnect() {
-	c.socket.Close()
-}
-
-func (c *Client) Send() {
-	for {
-		c.server.sendPacket(&Packet{descriptor: Reliable | Ordered}, false)
-		time.Sleep(100 * time.Millisecond)
-	}
+	c.protocolImpl.destroy()
+	c.server = nil
 }
