@@ -9,6 +9,7 @@ const (
 	ProtocolId = 231
 
 	MaxSkippedPackets = 25
+	TimeoutThreshold = 8000
 
 	// size needs to ensure that every slot in buffers is at least overwritten 2 times, otherwise acks will fail (max_sequence % size > 32 && max_sequence / size >= 2)
 	SequenceBufferSize = 200

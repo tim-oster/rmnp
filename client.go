@@ -40,6 +40,10 @@ func NewClient(server string) *Client {
 		fmt.Println("disconnected from server")
 	})
 
+	AddConnectionCallback(&c.onTimeout, func(connection *Connection) {
+		fmt.Println("timeout")
+	})
+
 	c.init(server)
 	return c
 }

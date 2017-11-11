@@ -6,11 +6,11 @@ package rmnp
 
 import (
 	"net"
-	"sync"
 	"fmt"
 	"sort"
 	"time"
 	"context"
+	"sync"
 )
 
 type packetKeys []sequenceNumber
@@ -44,11 +44,18 @@ type Connection struct {
 	localUnreliableSequence  sequenceNumber
 	remoteUnreliableSequence sequenceNumber
 
-	lastSendTime   int64
-	lastResendTime int64
-	sendMapMutex   sync.Mutex
-	sendMap        map[sequenceNumber]*sendPacket // TODO use other data structure?
-	recvBuffer     *SequenceBuffer
+	lastSendTime     int64
+	lastResendTime   int64
+	lastReceivedTime int64
+	sendMapMutex     sync.Mutex
+	sendMap          map[sequenceNumber]*sendPacket // TODO use other data structure?
+	recvBuffer       *SequenceBuffer
+}
+
+func (c *Connection) startRoutines() {
+	c.ctx, c.stopRoutines = context.WithCancel(context.Background())
+	go c.update(c.ctx)
+	go c.keepAlive(c.ctx)
 }
 
 func (c *Connection) update(ctx context.Context) {
@@ -91,7 +98,25 @@ func (c *Connection) update(ctx context.Context) {
 	}
 }
 
+func (c *Connection) keepAlive(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(TimeoutThreshold * time.Millisecond / 2):
+		}
+
+		currentTime := currentTime()
+
+		if currentTime-c.lastReceivedTime > TimeoutThreshold {
+			c.protocol.timeoutClient(c)
+		}
+	}
+}
+
 func (c *Connection) handlePacket(packet []byte) {
+	c.lastReceivedTime = currentTime()
+
 	// TODO pool?
 	p := &Packet{}
 

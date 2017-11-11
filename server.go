@@ -19,7 +19,7 @@ func NewServer(address string) *Server {
 	s.readFunc = func(conn *net.UDPConn, buffer []byte) (int, *net.UDPAddr, bool) {
 		length, addr, err := conn.ReadFromUDP(buffer)
 
-		if err != nil{
+		if err != nil {
 			return 0, nil, false
 		}
 
@@ -31,11 +31,15 @@ func NewServer(address string) *Server {
 	}
 
 	AddConnectionCallback(&s.onConnect, func(connection *Connection) {
-		fmt.Println("new client")
+		fmt.Println("client connected:", connection.addr)
 	})
 
 	AddConnectionCallback(&s.onDisconnect, func(connection *Connection) {
-		fmt.Println("client disconnect")
+		fmt.Println("client disconnect:", connection.addr)
+	})
+
+	AddConnectionCallback(&s.onTimeout, func(connection *Connection) {
+		fmt.Println("timeout:", connection.addr)
 	})
 
 	s.init(address)

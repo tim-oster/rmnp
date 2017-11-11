@@ -30,6 +30,7 @@ type protocolImpl struct {
 	// for clients: only executed if client is still connected. if client disconnects callback will not be executed
 	onConnect    ConnectionCallbacks
 	onDisconnect ConnectionCallbacks
+	onTimeout    ConnectionCallbacks
 }
 
 func (impl *protocolImpl) init(address string) {
@@ -120,7 +121,6 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 
 func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	hash := addrHash(addr)
-	fmt.Println("connection from:", addr)
 
 	// TODO pool?
 	connection := &Connection{
@@ -131,20 +131,22 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 		sendMap:      make(map[sequenceNumber]*sendPacket),
 		recvBuffer:   NewSequenceBuffer(SequenceBufferSize),
 	}
-	connection.ctx, connection.stopRoutines = context.WithCancel(context.Background())
 	impl.connections[hash] = connection
 
 	connection.sendLowLevelPacket(Reliable | Connect)
+	connection.startRoutines()
 
-	go connection.update(connection.ctx)
 	return connection
 }
 
 func (impl *protocolImpl) disconnectClient(connection *Connection) {
-	fmt.Println("disconnection of:", connection.addr)
-
 	connection.sendLowLevelPacket(Reliable | Disconnect)
 	connection.stopRoutines()
 
 	delete(impl.connections, addrHash(connection.addr))
+}
+
+func (impl *protocolImpl) timeoutClient(connection *Connection) {
+	invokeConnectionCallbacks(impl.onTimeout, connection)
+	impl.disconnectClient(connection)
 }
