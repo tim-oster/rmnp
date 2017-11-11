@@ -6,6 +6,7 @@ package rmnp
 
 import (
 	"net"
+	"fmt"
 )
 
 type Client struct {
@@ -17,7 +18,7 @@ type Client struct {
 func NewClient(server string) *Client {
 	c := new(Client)
 
-	c.protocolImpl.readFunc = func(conn *net.UDPConn, buffer []byte) (int, *net.UDPAddr, bool) {
+	c.readFunc = func(conn *net.UDPConn, buffer []byte) (int, *net.UDPAddr, bool) {
 		length, err := conn.Read(buffer)
 
 		if err != nil {
@@ -27,11 +28,15 @@ func NewClient(server string) *Client {
 		return length, c.server.addr, true
 	}
 
-	c.protocolImpl.writeFunc = func(c *Connection, buffer []byte) {
+	c.writeFunc = func(c *Connection, buffer []byte) {
 		c.conn.Write(buffer)
 	}
 
-	c.protocolImpl.init(server)
+	AddConnectionCallback(&c.onConnect, func(connection *Connection) {
+		fmt.Println("connected to server")
+	})
+
+	c.init(server)
 	return c
 }
 
@@ -40,13 +45,11 @@ func (c *Client) Connect() {
 	checkError("Cannot connect to server", err)
 
 	c.socket = socket
-	c.server = c.protocolImpl.connectClient(socket.RemoteAddr().(*net.UDPAddr))
-
-	c.protocolImpl.listen()
-	c.server.sendLowLevelPacket(Reliable | Connect)
+	c.listen()
+	c.server = c.connectClient(socket.RemoteAddr().(*net.UDPAddr))
 }
 
 func (c *Client) Disconnect() {
-	c.protocolImpl.destroy()
+	c.destroy()
 	c.server = nil
 }

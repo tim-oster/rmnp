@@ -4,7 +4,10 @@
 
 package rmnp
 
-import "net"
+import (
+	"net"
+	"fmt"
+)
 
 type Server struct {
 	protocolImpl
@@ -13,7 +16,7 @@ type Server struct {
 func NewServer(address string) *Server {
 	s := new(Server)
 
-	s.protocolImpl.readFunc = func(conn *net.UDPConn, buffer []byte) (int, *net.UDPAddr, bool) {
+	s.readFunc = func(conn *net.UDPConn, buffer []byte) (int, *net.UDPAddr, bool) {
 		length, addr, err := conn.ReadFromUDP(buffer)
 
 		if err != nil{
@@ -23,11 +26,15 @@ func NewServer(address string) *Server {
 		return length, addr, true
 	}
 
-	s.protocolImpl.writeFunc = func(c *Connection, buffer []byte) {
+	s.writeFunc = func(c *Connection, buffer []byte) {
 		c.conn.WriteToUDP(buffer, c.addr)
 	}
 
-	s.protocolImpl.init(address)
+	AddConnectionCallback(&s.onConnect, func(connection *Connection) {
+		fmt.Println("new client")
+	})
+
+	s.init(address)
 	return s
 }
 
@@ -35,7 +42,7 @@ func (s *Server) Start() {
 	socket, err := net.ListenUDP("udp", s.address)
 	checkError("Cannot listen on udp", err)
 	s.socket = socket
-	s.protocolImpl.listen()
+	s.listen()
 }
 
 func (s *Server) Stop() {

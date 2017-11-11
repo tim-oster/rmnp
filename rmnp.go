@@ -25,6 +25,9 @@ type protocolImpl struct {
 	connections map[uint16]*Connection
 	readFunc    ReadFunc
 	writeFunc   WriteFunc
+
+	// callbacks
+	onConnect ConnectionCallbacks
 }
 
 func (impl *protocolImpl) init(address string) {
@@ -100,6 +103,10 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		connection = impl.connectClient(addr)
 	}
 
+	if descriptor(packet[5])&Connect != 0 {
+		invokeConnectionCallbacks(impl.onConnect, connection)
+	}
+
 	if descriptor(packet[5])&Disconnect != 0 {
 		impl.disconnectClient(connection)
 		return
@@ -123,6 +130,8 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	}
 	connection.ctx, connection.stopRoutines = context.WithCancel(context.Background())
 	impl.connections[hash] = connection
+
+	connection.sendLowLevelPacket(Reliable | Connect)
 
 	go connection.update(connection.ctx)
 	return connection
