@@ -127,13 +127,15 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	hash := addrHash(addr)
 
 	// TODO pool?
+	// TODO move to connection.go?
 	connection := &Connection{
-		protocol:     impl,
-		conn:         impl.socket,
-		addr:         addr,
-		orderedChain: NewPacketChain(),
-		sendMap:      make(map[sequenceNumber]*sendPacket),
-		recvBuffer:   NewSequenceBuffer(SequenceBufferSize),
+		protocol:          impl,
+		conn:              impl.socket,
+		addr:              addr,
+		orderedChain:      NewPacketChain(),
+		sendMap:           make(map[sequenceNumber]*sendPacket),
+		receiveBuffer:     NewSequenceBuffer(SequenceBufferSize),
+		congestionHandler: NewCongestionHandler(),
 	}
 	impl.connections[hash] = connection
 

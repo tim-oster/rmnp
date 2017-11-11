@@ -9,13 +9,23 @@ const (
 	ProtocolId = 231
 
 	MaxSkippedPackets = 25
-	TimeoutThreshold = 8000
+	MaxPacketResends  = 15
 
 	// size needs to ensure that every slot in buffers is at least overwritten 2 times, otherwise acks will fail (max_sequence % size > 32 && max_sequence / size >= 2)
 	SequenceBufferSize = 200
 
-	UpdateLoopTimeout = 10
-	ReackTimeout      = 50
-	ResendTimeout     = 50
-	SendRemoveTimeout = 1600
+	UpdateLoopInterval = 10
+	ReackTimeout       = 50
+	ResendTimeout      = 50
+	SendRemoveTimeout  = 1600
+
+	TimeoutThreshold = 8000
+
+	RTTSmoothFactor               = 0.1
+	BadModeMultiplier             = 2.5
+	CongestionThreshold           = 250
+	GoodRTTRewardInterval         = 10 * 1000
+	BadRTTPunishTimeout           = 10 * 1000
+	MaxCongestionRequiredTime     = 60 * 1000
+	DefaultCongestionRequiredTime = 4 * 1000
 )

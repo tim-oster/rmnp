@@ -44,12 +44,13 @@ type Connection struct {
 	localUnreliableSequence  sequenceNumber
 	remoteUnreliableSequence sequenceNumber
 
-	lastSendTime     int64
-	lastResendTime   int64
-	lastReceivedTime int64
-	sendMapMutex     sync.Mutex
-	sendMap          map[sequenceNumber]*sendPacket // TODO use other data structure?
-	recvBuffer       *SequenceBuffer
+	lastSendTime      int64
+	lastResendTime    int64
+	lastReceivedTime  int64
+	sendMapMutex      sync.Mutex
+	sendMap           map[sequenceNumber]*sendPacket // TODO use other data structure?
+	receiveBuffer     *SequenceBuffer
+	congestionHandler *congestionHandler
 }
 
 func (c *Connection) destroy() {
@@ -59,7 +60,8 @@ func (c *Connection) destroy() {
 
 	c.orderedChain = nil
 	c.sendMap = nil
-	c.recvBuffer = nil
+	c.receiveBuffer = nil
+	c.congestionHandler = nil
 }
 
 func (c *Connection) startRoutines() {
@@ -73,12 +75,12 @@ func (c *Connection) update(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(UpdateLoopTimeout * time.Millisecond):
+		case <-time.After(UpdateLoopInterval * time.Millisecond):
 		}
 
 		currentTime := currentTime()
 
-		if currentTime-c.lastResendTime > ResendTimeout {
+		if currentTime-c.lastResendTime > c.congestionHandler.mul(ResendTimeout) {
 			c.lastResendTime = currentTime
 
 			c.sendMapMutex.Lock()
@@ -89,7 +91,12 @@ func (c *Connection) update(ctx context.Context) {
 			}
 			sort.Sort(packetKeys(keys))
 
-			for _, key := range keys {
+		resendLoop:
+			for i, key := range keys {
+				if int64(i) >= c.congestionHandler.div(MaxPacketResends) {
+					break resendLoop
+				}
+
 				packet := c.sendMap[key]
 
 				if currentTime-packet.sendTime > SendRemoveTimeout {
@@ -102,7 +109,7 @@ func (c *Connection) update(ctx context.Context) {
 			c.sendMapMutex.Unlock()
 		}
 
-		if currentTime-c.lastSendTime > ReackTimeout {
+		if currentTime-c.lastSendTime > c.congestionHandler.mul(ReackTimeout) {
 			c.sendAckPacket()
 		}
 	}
@@ -153,13 +160,13 @@ func (c *Connection) handlePacket(packet []byte) {
 func (c *Connection) handleReliablePacket(packet *Packet) bool {
 	fmt.Println("recveived sequences #", packet.sequence)
 
-	if c.recvBuffer.Get(packet.sequence) {
+	if c.receiveBuffer.Get(packet.sequence) {
 		fmt.Println(":: was duplicate")
 		return false
 	}
 
 	// update receive states
-	c.recvBuffer.Set(packet.sequence, true)
+	c.receiveBuffer.Set(packet.sequence, true)
 
 	// update remote sequences number
 	if greaterThanSequence(packet.sequence, c.remoteSequence) && differenceSequence(packet.sequence, c.remoteSequence) <= MaxSkippedPackets {
@@ -169,7 +176,7 @@ func (c *Connection) handleReliablePacket(packet *Packet) bool {
 	// update ack bit mask for last 32 packets
 	c.ackBits = 0
 	for i := sequenceNumber(1); i <= 32; i++ {
-		if c.recvBuffer.Get(c.remoteSequence - i) {
+		if c.receiveBuffer.Get(c.remoteSequence - i) {
 			c.ackBits |= 1 << (i - 1)
 		}
 	}
@@ -205,10 +212,13 @@ func (c *Connection) handleAckPacket(packet *Packet) bool {
 			key := packet.ack - i
 
 			c.sendMapMutex.Lock()
-			if _, ok := c.sendMap[key]; ok {
+
+			if p, ok := c.sendMap[key]; ok {
+				c.congestionHandler.check(p.sendTime)
 				delete(c.sendMap, key)
 				fmt.Println("#", key, "acked")
 			}
+
 			c.sendMapMutex.Unlock()
 		}
 	}

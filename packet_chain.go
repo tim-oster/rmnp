@@ -20,14 +20,14 @@ func NewPacketChain() *packetChain {
 	return c
 }
 
-func (c *packetChain) Chain(packet *Packet) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+func (chain *packetChain) Chain(packet *Packet) {
+	chain.mutex.Lock()
+	defer chain.mutex.Unlock()
 
 	// TODO cleanup if len(packets) == max
 
 	i := 0
-	for _, p := range c.packets {
+	for _, p := range chain.packets {
 		if greaterThanOrder(packet.order, p.order) {
 			i++
 		} else {
@@ -35,25 +35,25 @@ func (c *packetChain) Chain(packet *Packet) {
 		}
 	}
 
-	c.packets = append(c.packets[:i], append([]*Packet{packet}, c.packets[i:]...)...)
+	chain.packets = append(chain.packets[:i], append([]*Packet{packet}, chain.packets[i:]...)...)
 }
 
 // TODO optimize
-func (c *packetChain) PopConsecutive() []*Packet {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+func (chain *packetChain) PopConsecutive() []*Packet {
+	chain.mutex.Lock()
+	defer chain.mutex.Unlock()
 
 	// TODO pool?
 	out := make([]*Packet, 0)
 
-	for _, p := range c.packets {
-		if p.order == c.next {
-			c.next++
+	for _, p := range chain.packets {
+		if p.order == chain.next {
+			chain.next++
 			out = append(out, p)
 		}
 	}
 
-	c.packets = c.packets[len(out):]
+	chain.packets = chain.packets[len(out):]
 
 	return out
 }
