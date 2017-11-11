@@ -27,7 +27,9 @@ type protocolImpl struct {
 	writeFunc   WriteFunc
 
 	// callbacks
-	onConnect ConnectionCallbacks
+	// for clients: only executed if client is still connected. if client disconnects callback will not be executed
+	onConnect    ConnectionCallbacks
+	onDisconnect ConnectionCallbacks
 }
 
 func (impl *protocolImpl) init(address string) {
@@ -108,6 +110,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	}
 
 	if descriptor(packet[5])&Disconnect != 0 {
+		invokeConnectionCallbacks(impl.onDisconnect, connection)
 		impl.disconnectClient(connection)
 		return
 	}

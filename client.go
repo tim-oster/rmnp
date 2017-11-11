@@ -36,6 +36,10 @@ func NewClient(server string) *Client {
 		fmt.Println("connected to server")
 	})
 
+	AddConnectionCallback(&c.onDisconnect, func(connection *Connection) {
+		fmt.Println("disconnected from server")
+	})
+
 	c.init(server)
 	return c
 }
@@ -43,7 +47,6 @@ func NewClient(server string) *Client {
 func (c *Client) Connect() {
 	socket, err := net.DialUDP("udp", nil, c.address)
 	checkError("Cannot connect to server", err)
-
 	c.socket = socket
 	c.listen()
 	c.server = c.connectClient(socket.RemoteAddr().(*net.UDPAddr))

@@ -34,6 +34,10 @@ func NewServer(address string) *Server {
 		fmt.Println("new client")
 	})
 
+	AddConnectionCallback(&s.onDisconnect, func(connection *Connection) {
+		fmt.Println("client disconnect")
+	})
+
 	s.init(address)
 	return s
 }
@@ -46,5 +50,5 @@ func (s *Server) Start() {
 }
 
 func (s *Server) Stop() {
-	s.socket.Close()
+	s.destroy()
 }
