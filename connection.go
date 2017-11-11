@@ -52,6 +52,16 @@ type Connection struct {
 	recvBuffer       *SequenceBuffer
 }
 
+func (c *Connection) destroy() {
+	c.protocol = nil
+	c.conn = nil
+	c.addr = nil
+
+	c.orderedChain = nil
+	c.sendMap = nil
+	c.recvBuffer = nil
+}
+
 func (c *Connection) startRoutines() {
 	c.ctx, c.stopRoutines = context.WithCancel(context.Background())
 	go c.update(c.ctx)

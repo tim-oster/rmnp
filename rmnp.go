@@ -54,6 +54,10 @@ func (impl *protocolImpl) destroy() {
 	impl.connections = nil
 	impl.readFunc = nil
 	impl.writeFunc = nil
+
+	impl.onConnect = nil
+	impl.onDisconnect = nil
+	impl.onTimeout = nil
 }
 
 func (impl *protocolImpl) listen() {
@@ -144,6 +148,7 @@ func (impl *protocolImpl) disconnectClient(connection *Connection) {
 	connection.stopRoutines()
 
 	delete(impl.connections, addrHash(connection.addr))
+	connection.destroy()
 }
 
 func (impl *protocolImpl) timeoutClient(connection *Connection) {
