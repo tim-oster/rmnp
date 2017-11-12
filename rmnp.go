@@ -114,7 +114,12 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		}
 
 		connection = impl.connectClient(addr)
+	}
+
+	// done this way to ensure that connect callback is executed on client-side
+	if connection.state == Disconnected && descriptor(packet[5])&Connect != 0 {
 		invokeConnectionCallbacks(impl.onConnect, connection)
+		connection.state = Connected
 	}
 
 	if descriptor(packet[5])&Disconnect != 0 {
@@ -136,7 +141,6 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	connection := newConnection(impl, addr)
 	impl.connections[hash] = connection
 
-	connection.state = Connected
 	connection.sendLowLevelPacket(Reliable | Connect)
 	connection.startRoutines()
 
