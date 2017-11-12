@@ -227,6 +227,10 @@ func (c *Connection) handleAckPacket(packet *Packet) bool {
 }
 
 func (c *Connection) sendPacket(packet *Packet, resend bool) {
+	if !packet.Flag(Reliable) && c.congestionHandler.shouldDrop() {
+		return
+	}
+
 	packet.protocolId = ProtocolId
 
 	if !resend {

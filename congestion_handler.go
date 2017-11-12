@@ -1,5 +1,7 @@
 package rmnp
 
+import "fmt"
+
 type congestionMode uint8
 
 const (
@@ -14,7 +16,8 @@ type congestionHandler struct {
 	lastChangeTime int64
 	requiredTime   int64
 
-	multiplier float32
+	multiplier      float32
+	unreliableCount byte
 }
 
 func NewCongestionHandler() *congestionHandler {
@@ -33,7 +36,7 @@ func (handler *congestionHandler) check(sendTime int64) {
 	if handler.rtt == 0 {
 		handler.rtt = rtt
 	} else {
-		handler.rtt += (rtt - handler.rtt) * RTTSmoothFactor
+		handler.rtt += int64(float32(rtt - handler.rtt) * RTTSmoothFactor)
 	}
 
 	switch handler.mode {
@@ -63,8 +66,10 @@ func (handler *congestionHandler) changeMode(mode congestionMode) {
 	switch mode {
 	case Good:
 		handler.multiplier = 1.0
+		fmt.Println("============================> congestion mode: good")
 	case Bad:
 		handler.multiplier = BadModeMultiplier
+		fmt.Println("============================> congestion mode: bad")
 	}
 
 	handler.mode = mode
@@ -77,4 +82,16 @@ func (handler *congestionHandler) div(i int64) int64 {
 
 func (handler *congestionHandler) mul(i int64) int64 {
 	return int64(float32(i) * handler.multiplier)
+}
+
+func (handler *congestionHandler) shouldDrop() bool {
+	switch handler.mode {
+	case Good:
+		return false
+	case Bad:
+		handler.unreliableCount++
+		return handler.unreliableCount%CongestionPacketReduction == 0
+	}
+
+	return false
 }

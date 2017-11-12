@@ -7,6 +7,7 @@ package rmnp
 import (
 	"net"
 	"fmt"
+	"time"
 )
 
 type Client struct {
@@ -59,4 +60,11 @@ func (c *Client) Connect() {
 func (c *Client) Disconnect() {
 	c.destroy()
 	c.server = nil
+}
+
+func (c *Client) Send() {
+	for {
+		c.server.sendLowLevelPacket(Reliable)
+		time.Sleep(500 * time.Millisecond)
+	}
 }

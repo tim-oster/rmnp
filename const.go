@@ -28,4 +28,5 @@ const (
 	BadRTTPunishTimeout           = 10 * 1000
 	MaxCongestionRequiredTime     = 60 * 1000
 	DefaultCongestionRequiredTime = 4 * 1000
+	CongestionPacketReduction     = 4
 )
