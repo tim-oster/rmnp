@@ -14,6 +14,9 @@ type Client struct {
 	protocolImpl
 
 	server *Connection
+
+	// TODO tmp
+	stop bool
 }
 
 func NewClient(server string) *Client {
@@ -39,6 +42,8 @@ func NewClient(server string) *Client {
 
 	AddConnectionCallback(&c.onDisconnect, func(connection *Connection) {
 		fmt.Println("disconnected from server")
+		c.stop = true
+		c.destroy()
 	})
 
 	AddConnectionCallback(&c.onTimeout, func(connection *Connection) {
@@ -62,8 +67,13 @@ func (c *Client) Disconnect() {
 	c.server = nil
 }
 
+// TODO tmp
 func (c *Client) Send() {
 	for {
+		if c.stop {
+			break
+		}
+
 		c.server.sendLowLevelPacket(Reliable)
 		time.Sleep(500 * time.Millisecond)
 	}

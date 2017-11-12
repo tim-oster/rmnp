@@ -16,10 +16,12 @@ const (
 
 	UpdateLoopInterval = 10
 	ReackTimeout       = 50
+	AutoPingInterval   = 15
 	ResendTimeout      = 50
 	SendRemoveTimeout  = 1600
 
 	TimeoutThreshold = 8000
+	MaxPing          = 150
 
 	RTTSmoothFactor               = 0.1
 	BadModeMultiplier             = 2.5

@@ -13,6 +13,13 @@ import (
 	"sync"
 )
 
+type connectionState uint8
+
+const (
+	Disconnected connectionState = iota
+	Connected
+)
+
 type packetKeys []sequenceNumber
 
 func (a packetKeys) Len() int           { return len(a) }
@@ -28,6 +35,7 @@ type Connection struct {
 	protocol *protocolImpl
 	conn     *net.UDPConn
 	addr     *net.UDPAddr
+	state    connectionState
 
 	// for go routines
 	ctx          context.Context
@@ -44,19 +52,34 @@ type Connection struct {
 	localUnreliableSequence  sequenceNumber
 	remoteUnreliableSequence sequenceNumber
 
-	lastSendTime      int64
-	lastResendTime    int64
-	lastReceivedTime  int64
-	sendMapMutex      sync.Mutex
-	sendMap           map[sequenceNumber]*sendPacket // TODO use other data structure?
-	receiveBuffer     *SequenceBuffer
-	congestionHandler *congestionHandler
+	lastSendTime       int64
+	lastResendTime     int64
+	lastReceivedTime   int64
+	pingPacketInterval uint8
+	sendMapMutex       sync.Mutex
+	sendMap            map[sequenceNumber]*sendPacket // TODO use other data structure?
+	receiveBuffer      *SequenceBuffer
+	congestionHandler  *congestionHandler
+}
+
+func newConnection(impl *protocolImpl, addr *net.UDPAddr) *Connection {
+	return &Connection{
+		protocol:          impl,
+		conn:              impl.socket,
+		addr:              addr,
+		state:             Disconnected,
+		orderedChain:      NewPacketChain(),
+		sendMap:           make(map[sequenceNumber]*sendPacket),
+		receiveBuffer:     NewSequenceBuffer(SequenceBufferSize),
+		congestionHandler: NewCongestionHandler(),
+	}
 }
 
 func (c *Connection) destroy() {
 	c.protocol = nil
 	c.conn = nil
 	c.addr = nil
+	c.state = Disconnected
 
 	c.orderedChain = nil
 	c.sendMap = nil
@@ -78,40 +101,51 @@ func (c *Connection) update(ctx context.Context) {
 		case <-time.After(UpdateLoopInterval * time.Millisecond):
 		}
 
-		currentTime := currentTime()
+		func() {
+			c.protocol.waitGroup.Add(1)
+			defer c.protocol.waitGroup.Done()
 
-		if currentTime-c.lastResendTime > c.congestionHandler.mul(ResendTimeout) {
-			c.lastResendTime = currentTime
+			currentTime := currentTime()
 
-			c.sendMapMutex.Lock()
+			if currentTime-c.lastResendTime > c.congestionHandler.mul(ResendTimeout) {
+				c.lastResendTime = currentTime
 
-			keys := make([]sequenceNumber, 0)
-			for key := range c.sendMap {
-				keys = append(keys, key)
-			}
-			sort.Sort(packetKeys(keys))
+				c.sendMapMutex.Lock()
 
-		resendLoop:
-			for i, key := range keys {
-				if int64(i) >= c.congestionHandler.div(MaxPacketResends) {
-					break resendLoop
+				keys := make([]sequenceNumber, 0)
+				for key := range c.sendMap {
+					keys = append(keys, key)
+				}
+				sort.Sort(packetKeys(keys))
+
+			resendLoop:
+				for i, key := range keys {
+					if int64(i) >= c.congestionHandler.div(MaxPacketResends) {
+						break resendLoop
+					}
+
+					packet := c.sendMap[key]
+
+					if currentTime-packet.sendTime > SendRemoveTimeout {
+						delete(c.sendMap, key)
+					} else {
+						c.sendPacket(packet.packet, true)
+					}
 				}
 
-				packet := c.sendMap[key]
-
-				if currentTime-packet.sendTime > SendRemoveTimeout {
-					delete(c.sendMap, key)
-				} else {
-					c.sendPacket(packet.packet, true)
-				}
+				c.sendMapMutex.Unlock()
 			}
 
-			c.sendMapMutex.Unlock()
-		}
+			if currentTime-c.lastSendTime > c.congestionHandler.mul(ReackTimeout) {
+				c.sendAckPacket()
 
-		if currentTime-c.lastSendTime > c.congestionHandler.mul(ReackTimeout) {
-			c.sendAckPacket()
-		}
+				if c.pingPacketInterval%AutoPingInterval == 0 {
+					c.sendLowLevelPacket(Reliable)
+				}
+
+				c.pingPacketInterval++
+			}
+		}()
 	}
 }
 
@@ -123,11 +157,16 @@ func (c *Connection) keepAlive(ctx context.Context) {
 		case <-time.After(TimeoutThreshold * time.Millisecond / 2):
 		}
 
-		currentTime := currentTime()
+		func() {
+			c.protocol.waitGroup.Add(1)
+			defer c.protocol.waitGroup.Done()
 
-		if currentTime-c.lastReceivedTime > TimeoutThreshold {
-			c.protocol.timeoutClient(c)
-		}
+			currentTime := currentTime()
+
+			if currentTime-c.lastReceivedTime > TimeoutThreshold || c.GetPing() > MaxPing {
+				c.protocol.timeoutClient(c)
+			}
+		}()
 	}
 }
 
@@ -282,4 +321,8 @@ func (c *Connection) sendLowLevelPacket(descriptor descriptor) {
 
 func (c *Connection) sendAckPacket() {
 	c.sendLowLevelPacket(Ack)
+}
+
+func (c *Connection) GetPing() int32 {
+	return int32(c.congestionHandler.rtt / 2)
 }

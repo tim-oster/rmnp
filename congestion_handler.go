@@ -36,7 +36,7 @@ func (handler *congestionHandler) check(sendTime int64) {
 	if handler.rtt == 0 {
 		handler.rtt = rtt
 	} else {
-		handler.rtt += int64(float32(rtt - handler.rtt) * RTTSmoothFactor)
+		handler.rtt += int64(float32(rtt-handler.rtt) * RTTSmoothFactor)
 	}
 
 	switch handler.mode {
