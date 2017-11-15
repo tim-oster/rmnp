@@ -30,17 +30,21 @@ func NewServer(address string) *Server {
 		c.conn.WriteToUDP(buffer, c.addr)
 	}
 
-	AddConnectionCallback(&s.onConnect, func(connection *Connection) {
+	s.onConnect = func(connection *Connection) {
 		fmt.Println("client connected:", connection.addr)
-	})
+	}
 
-	AddConnectionCallback(&s.onDisconnect, func(connection *Connection) {
+	s.onDisconnect = func(connection *Connection) {
 		fmt.Println("client disconnect:", connection.addr)
-	})
+	}
 
-	AddConnectionCallback(&s.onTimeout, func(connection *Connection) {
+	s.onTimeout = func(connection *Connection) {
 		fmt.Println("timeout:", connection.addr)
-	})
+	}
+
+	s.onValidation = func(connection *Connection, addr *net.UDPAddr, packet []byte) bool {
+		return true
+	}
 
 	s.init(address)
 	return s
@@ -49,6 +53,8 @@ func NewServer(address string) *Server {
 func (s *Server) Start() {
 	socket, err := net.ListenUDP("udp", s.address)
 	checkError("Cannot listen on udp", err)
+	socket.SetReadBuffer(MTU)
+	socket.SetWriteBuffer(MTU)
 	s.socket = socket
 	s.listen()
 }

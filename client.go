@@ -36,19 +36,23 @@ func NewClient(server string) *Client {
 		c.conn.Write(buffer)
 	}
 
-	AddConnectionCallback(&c.onConnect, func(connection *Connection) {
+	c.onConnect = func(connection *Connection) {
 		fmt.Println("connected to server")
-	})
+	}
 
-	AddConnectionCallback(&c.onDisconnect, func(connection *Connection) {
+	c.onDisconnect = func(connection *Connection) {
 		fmt.Println("disconnected from server")
 		c.stop = true
 		c.destroy()
-	})
+	}
 
-	AddConnectionCallback(&c.onTimeout, func(connection *Connection) {
+	c.onTimeout = func(connection *Connection) {
 		fmt.Println("timeout")
-	})
+	}
+
+	c.onValidation = func(connection *Connection, addr *net.UDPAddr, packet []byte) bool {
+		return false
+	}
 
 	c.init(server)
 	return c
@@ -57,8 +61,11 @@ func NewClient(server string) *Client {
 func (c *Client) Connect() {
 	socket, err := net.DialUDP("udp", nil, c.address)
 	checkError("Cannot connect to server", err)
+	socket.SetReadBuffer(MTU)
+	socket.SetWriteBuffer(MTU)
 	c.socket = socket
 	c.listen()
+
 	c.server = c.connectClient(socket.RemoteAddr().(*net.UDPAddr))
 }
 

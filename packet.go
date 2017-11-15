@@ -117,7 +117,36 @@ func validateHeader(packet []byte) bool {
 		return false
 	}
 
+	if len(packet) < headerSize(packet) {
+		return false
+	}
+
 	hash1 := binary.BigEndian.Uint32(packet[1:5])
 	hash2 := crc32.ChecksumIEEE(append([]byte{packet[0], 0, 0, 0, 0}, packet[5:]...))
 	return hash1 == hash2
+}
+
+func headerSize(packet []byte) int {
+	desc := descriptor(packet[5])
+	size := 0
+
+	// protocolId (1) + crc (4) + descriptor (1)
+	size += 6
+
+	if desc&Reliable != 0 || desc&Ordered != 0 {
+		// sequence (2)
+		size += 2
+	}
+
+	if desc&Reliable != 0 && desc&Ordered != 0 {
+		// order (1)
+		size += 2
+	}
+
+	if desc&Ack != 0 {
+		// ack (2) + ackBits (4)
+		size += 6
+	}
+
+	return size
 }

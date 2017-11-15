@@ -12,6 +12,23 @@ import (
 	"sync"
 )
 
+type ConnectionCallback func(*Connection)
+type PacketCallback func(*Connection, *net.UDPAddr, []byte) bool
+
+func invokeConnectionCallback(callback ConnectionCallback, connection *Connection) {
+	if callback != nil {
+		callback(connection)
+	}
+}
+
+func invokePacketCallback(callback PacketCallback, connection *Connection, addr *net.UDPAddr, packet []byte) bool {
+	if callback != nil {
+		return callback(connection, addr, packet)
+	}
+
+	return true
+}
+
 type ReadFunc func(*net.UDPConn, []byte) (int, *net.UDPAddr, bool)
 type WriteFunc func(*Connection, []byte)
 
@@ -30,9 +47,10 @@ type protocolImpl struct {
 
 	// callbacks
 	// for clients: only executed if client is still connected. if client disconnects callback will not be executed
-	onConnect    ConnectionCallbacks
-	onDisconnect ConnectionCallbacks
-	onTimeout    ConnectionCallbacks
+	onConnect    ConnectionCallback
+	onDisconnect ConnectionCallback
+	onTimeout    ConnectionCallback
+	onValidation PacketCallback
 }
 
 func (impl *protocolImpl) init(address string) {
@@ -62,6 +80,7 @@ func (impl *protocolImpl) destroy() {
 	impl.onConnect = nil
 	impl.onDisconnect = nil
 	impl.onTimeout = nil
+	impl.onValidation = nil
 }
 
 func (impl *protocolImpl) listen() {
@@ -107,9 +126,14 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	connection, exists := impl.connections[hash]
 
 	if !exists {
-		// check if connection packet
 		if descriptor(packet[5])&Connect == 0 {
 			fmt.Println("no connect packet send")
+			return
+		}
+
+		header := headerSize(packet)
+		if !invokePacketCallback(impl.onValidation, nil, addr, packet[header:]) {
+			fmt.Println("connection rejected")
 			return
 		}
 
@@ -118,7 +142,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 
 	// done this way to ensure that connect callback is executed on client-side
 	if connection.state == Disconnected && descriptor(packet[5])&Connect != 0 {
-		invokeConnectionCallbacks(impl.onConnect, connection)
+		invokeConnectionCallback(impl.onConnect, connection)
 		connection.state = Connected
 	}
 
@@ -159,13 +183,13 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	delete(impl.connections, addrHash(connection.addr))
 
 	if !shutdown {
-		invokeConnectionCallbacks(impl.onDisconnect, connection)
+		invokeConnectionCallback(impl.onDisconnect, connection)
 	}
 
 	connection.destroy()
 }
 
 func (impl *protocolImpl) timeoutClient(connection *Connection) {
-	invokeConnectionCallbacks(impl.onTimeout, connection)
+	invokeConnectionCallback(impl.onTimeout, connection)
 	impl.disconnectClient(connection, false)
 }
