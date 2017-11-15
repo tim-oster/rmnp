@@ -59,14 +59,9 @@ func NewClient(server string) *Client {
 }
 
 func (c *Client) Connect() {
-	socket, err := net.DialUDP("udp", nil, c.address)
-	checkError("Cannot connect to server", err)
-	socket.SetReadBuffer(MTU)
-	socket.SetWriteBuffer(MTU)
-	c.socket = socket
+	c.setSocket(net.DialUDP("udp", nil, c.address))
 	c.listen()
-
-	c.server = c.connectClient(socket.RemoteAddr().(*net.UDPAddr))
+	c.server = c.connectClient(c.socket.RemoteAddr().(*net.UDPAddr))
 }
 
 func (c *Client) Disconnect() {

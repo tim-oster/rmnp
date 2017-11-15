@@ -51,11 +51,7 @@ func NewServer(address string) *Server {
 }
 
 func (s *Server) Start() {
-	socket, err := net.ListenUDP("udp", s.address)
-	checkError("Cannot listen on udp", err)
-	socket.SetReadBuffer(MTU)
-	socket.SetWriteBuffer(MTU)
-	s.socket = socket
+	s.setSocket(net.ListenUDP("udp", s.address))
 	s.listen()
 }
 

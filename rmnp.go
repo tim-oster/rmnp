@@ -83,6 +83,13 @@ func (impl *protocolImpl) destroy() {
 	impl.onValidation = nil
 }
 
+func (impl *protocolImpl) setSocket(socket *net.UDPConn, err error) {
+	checkError("Error creating socket", err)
+	impl.socket = socket
+	impl.socket.SetReadBuffer(MTU)
+	impl.socket.SetWriteBuffer(MTU)
+}
+
 func (impl *protocolImpl) listen() {
 	impl.ctx, impl.cancel = context.WithCancel(context.Background())
 
@@ -91,7 +98,7 @@ func (impl *protocolImpl) listen() {
 			// TODO pool?
 			buffer := make([]byte, MTU)
 
-			// TODO execute on multiple go-routines
+			// TODO execute on multiple go-routines?
 			impl.waitGroup.Add(1)
 			impl.socket.SetDeadline(time.Now().Add(time.Second))
 			length, addr, next := impl.readFunc(impl.socket, buffer)
