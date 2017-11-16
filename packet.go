@@ -67,7 +67,7 @@ func (p *Packet) Serialize() []byte {
 func (p *Packet) Deserialize(packet []byte) bool {
 	s := NewSerializerFor(packet)
 
-	// header is valid (validated before packet processing)
+	// head is valid (validated before data processing)
 	s.Read(&p.protocolId)
 	s.Read(&p.crc32)
 	s.Read(&p.descriptor)

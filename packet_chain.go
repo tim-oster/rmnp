@@ -8,52 +8,85 @@ import (
 	"sync"
 )
 
+const maxPacketChainLength = 255
+
 type packetChain struct {
-	next    orderNumber
-	packets []*Packet
-	mutex   sync.Mutex
+	next   orderNumber
+	start  *chainLink
+	length int
+	mutex  sync.Mutex
+}
+
+type chainLink struct {
+	next   *chainLink
+	packet *Packet
 }
 
 func NewPacketChain() *packetChain {
-	c := new(packetChain)
-	c.packets = make([]*Packet, 0, 255)
-	return c
+	return new(packetChain)
+}
+
+func (chain *packetChain) reset() {
+	chain.mutex.Lock()
+	defer chain.mutex.Unlock()
+
+	chain.next = 0
+	chain.start = nil
+	chain.length = 0
 }
 
 func (chain *packetChain) Chain(packet *Packet) {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
-	// TODO cleanup if len(packets) == max
+	if chain.start == nil {
+		chain.start = &chainLink{packet: packet}
+	} else {
+		var link *chainLink = nil
 
-	i := 0
-	for _, p := range chain.packets {
-		if greaterThanOrder(packet.order, p.order) {
-			i++
+		for l := chain.start; l != nil; l = l.next {
+			if greaterThanOrder(packet.order, l.packet.order) {
+				link = l
+			} else {
+				break
+			}
+		}
+
+		if link == nil {
+			chain.start = &chainLink{next: chain.start, packet: packet}
+		} else {
+			link.next = &chainLink{next: link.next, packet: packet}
+		}
+	}
+
+	chain.length++
+
+	if chain.length > maxPacketChainLength {
+		chain.start = chain.start.next
+	}
+}
+
+func (chain *packetChain) PopConsecutive() *chainLink {
+	chain.mutex.Lock()
+	defer chain.mutex.Unlock()
+
+	var last *chainLink = nil
+
+	for l := chain.start; l != nil; l = l.next {
+		if l.packet.order == chain.next {
+			chain.next++
+			last = l
 		} else {
 			break
 		}
 	}
 
-	chain.packets = append(chain.packets[:i], append([]*Packet{packet}, chain.packets[i:]...)...)
-}
-
-// TODO optimize
-func (chain *packetChain) PopConsecutive() []*Packet {
-	chain.mutex.Lock()
-	defer chain.mutex.Unlock()
-
-	// TODO pool?
-	out := make([]*Packet, 0)
-
-	for _, p := range chain.packets {
-		if p.order == chain.next {
-			chain.next++
-			out = append(out, p)
-		}
+	if last != nil {
+		start := chain.start
+		chain.start = last.next
+		last.next = nil
+		return start
 	}
 
-	chain.packets = chain.packets[len(out):]
-
-	return out
+	return nil
 }

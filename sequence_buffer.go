@@ -18,6 +18,10 @@ func NewSequenceBuffer(size sequenceNumber) *SequenceBuffer {
 	return buffer
 }
 
+func (buffer *SequenceBuffer) reset() {
+	// TODO
+}
+
 func (buffer *SequenceBuffer) Get(sequence sequenceNumber) bool {
 	if sequence < 0 {
 		sequence += buffer.size

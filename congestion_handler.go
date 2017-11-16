@@ -29,6 +29,10 @@ func NewCongestionHandler() *congestionHandler {
 	}
 }
 
+func (handler *congestionHandler) reset() {
+	// TODO
+}
+
 func (handler *congestionHandler) check(sendTime int64) {
 	time := currentTime()
 	rtt := time - sendTime

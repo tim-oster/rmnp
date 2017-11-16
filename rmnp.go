@@ -40,10 +40,13 @@ type protocolImpl struct {
 	cancel    context.CancelFunc
 	waitGroup sync.WaitGroup
 
-	// TODO thread-safe?
-	connections map[uint16]*Connection
-	readFunc    ReadFunc
-	writeFunc   WriteFunc
+	connectionsMutex sync.RWMutex
+	connections      map[uint16]*Connection
+	readFunc         ReadFunc
+	writeFunc        WriteFunc
+
+	packetPool     sync.Pool
+	connectionPool sync.Pool
 
 	// callbacks
 	// for clients: only executed if client is still connected. if client disconnects callback will not be executed
@@ -56,8 +59,19 @@ type protocolImpl struct {
 func (impl *protocolImpl) init(address string) {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	checkError("Failed to resolve udp address", err)
+
 	impl.address = addr
 	impl.connections = make(map[uint16]*Connection)
+
+	impl.packetPool = sync.Pool{
+		New: func() interface{} { return make([]byte, MTU) },
+	}
+
+	impl.connectionPool = sync.Pool{
+		New: func() interface{} {
+			return nil
+		},
+	}
 }
 
 // is blocking call!
@@ -69,10 +83,12 @@ func (impl *protocolImpl) destroy() {
 	impl.cancel()
 	impl.waitGroup.Wait()
 	impl.socket.Close()
+
+	impl.address = nil
+	impl.socket = nil
 	impl.ctx = nil
 	impl.cancel = nil
 
-	impl.address = nil
 	impl.connections = nil
 	impl.readFunc = nil
 	impl.writeFunc = nil
@@ -95,10 +111,8 @@ func (impl *protocolImpl) listen() {
 
 	go func(ctx context.Context) {
 		for {
-			// TODO pool?
-			buffer := make([]byte, MTU)
+			buffer := impl.packetPool.Get().([]byte)
 
-			// TODO execute on multiple go-routines?
 			impl.waitGroup.Add(1)
 			impl.socket.SetDeadline(time.Now().Add(time.Second))
 			length, addr, next := impl.readFunc(impl.socket, buffer)
@@ -106,6 +120,7 @@ func (impl *protocolImpl) listen() {
 
 			select {
 			case <-ctx.Done():
+				impl.packetPool.Put(buffer)
 				return
 			default:
 			}
@@ -114,27 +129,34 @@ func (impl *protocolImpl) listen() {
 				continue
 			}
 
-			// TODO handle in go-routine?
-			packet := buffer[:length]
+			go func(addr *net.UDPAddr, buffer []byte, length int) {
+				impl.waitGroup.Add(1)
+				defer impl.waitGroup.Done()
 
-			if !validateHeader(packet) {
-				fmt.Println("error during sending")
-				//return
-				continue
-			}
+				defer impl.packetPool.Put(buffer)
+				packet := buffer[:length]
 
-			impl.handlePacket(addr, packet)
+				if !validateHeader(packet) {
+					fmt.Println("error during sending")
+					return
+				}
+
+				impl.handlePacket(addr, packet)
+			}(addr, buffer, length)
 		}
 	}(impl.ctx)
 }
 
 func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	hash := addrHash(addr)
+
+	impl.connectionsMutex.RLock()
 	connection, exists := impl.connections[hash]
+	impl.connectionsMutex.RUnlock()
 
 	if !exists {
 		if descriptor(packet[5])&Connect == 0 {
-			fmt.Println("no connect packet send")
+			fmt.Println("no connect data data")
 			return
 		}
 
@@ -158,11 +180,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		return
 	}
 
-	go func() {
-		impl.waitGroup.Add(1)
-		defer impl.waitGroup.Done()
-		connection.handlePacket(packet)
-	}()
+	connection.handlePacket(packet)
 }
 
 func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
@@ -170,7 +188,10 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 
 	// TODO pool?
 	connection := newConnection(impl, addr)
+
+	impl.connectionsMutex.Lock()
 	impl.connections[hash] = connection
+	impl.connectionsMutex.Unlock()
 
 	connection.sendLowLevelPacket(Reliable | Connect)
 	connection.startRoutines()
@@ -187,13 +208,18 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	connection.sendLowLevelPacket(Reliable | Disconnect)
 	connection.stopRoutines()
 
-	delete(impl.connections, addrHash(connection.addr))
+	hash := addrHash(connection.addr)
+
+	impl.connectionsMutex.Lock()
+	delete(impl.connections, hash)
+	impl.connectionsMutex.Unlock()
 
 	if !shutdown {
 		invokeConnectionCallback(impl.onDisconnect, connection)
 	}
 
-	connection.destroy()
+	connection.reset()
+	impl.connectionPool.Put(connection)
 }
 
 func (impl *protocolImpl) timeoutClient(connection *Connection) {

@@ -7,10 +7,8 @@ package rmnp
 import (
 	"net"
 	"fmt"
-	"sort"
 	"time"
 	"context"
-	"sync"
 )
 
 type connectionState uint8
@@ -19,17 +17,6 @@ const (
 	Disconnected connectionState = iota
 	Connected
 )
-
-type packetKeys []sequenceNumber
-
-func (a packetKeys) Len() int           { return len(a) }
-func (a packetKeys) Less(i, j int) bool { return a[i] < a[j] }
-func (a packetKeys) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-
-type sendPacket struct {
-	packet   *Packet
-	sendTime int64
-}
 
 type Connection struct {
 	protocol *protocolImpl
@@ -56,8 +43,7 @@ type Connection struct {
 	lastResendTime     int64
 	lastReceivedTime   int64
 	pingPacketInterval uint8
-	sendMapMutex       sync.Mutex
-	sendMap            map[sequenceNumber]*sendPacket // TODO use other data structure?
+	sendBuffer         *sendBuffer
 	receiveBuffer      *SequenceBuffer
 	congestionHandler  *congestionHandler
 }
@@ -69,22 +55,35 @@ func newConnection(impl *protocolImpl, addr *net.UDPAddr) *Connection {
 		addr:              addr,
 		state:             Disconnected,
 		orderedChain:      NewPacketChain(),
-		sendMap:           make(map[sequenceNumber]*sendPacket),
+		sendBuffer:        NewSendBuffer(),
 		receiveBuffer:     NewSequenceBuffer(SequenceBufferSize),
 		congestionHandler: NewCongestionHandler(),
 	}
 }
 
-func (c *Connection) destroy() {
+func (c *Connection) reset() {
 	c.protocol = nil
 	c.conn = nil
 	c.addr = nil
 	c.state = Disconnected
 
-	c.orderedChain = nil
-	c.sendMap = nil
-	c.receiveBuffer = nil
-	c.congestionHandler = nil
+	c.orderedChain.reset()
+	c.sendBuffer.Reset()
+	c.receiveBuffer.reset()
+	c.congestionHandler.reset()
+
+	c.localSequence = 0
+	c.remoteSequence = 0
+	c.ackBits = 0
+	c.orderedSequence = 0
+
+	c.localUnreliableSequence = 0
+	c.remoteUnreliableSequence = 0
+
+	c.lastSendTime = 0
+	c.lastResendTime = 0
+	c.lastReceivedTime = 0
+	c.pingPacketInterval = 0
 }
 
 func (c *Connection) startRoutines() {
@@ -110,30 +109,19 @@ func (c *Connection) update(ctx context.Context) {
 			if currentTime-c.lastResendTime > c.congestionHandler.mul(ResendTimeout) {
 				c.lastResendTime = currentTime
 
-				c.sendMapMutex.Lock()
-
-				keys := make([]sequenceNumber, 0)
-				for key := range c.sendMap {
-					keys = append(keys, key)
-				}
-				sort.Sort(packetKeys(keys))
-
-			resendLoop:
-				for i, key := range keys {
+				c.sendBuffer.Iterate(func(i int, data *sendPacket) SendBufferOP {
 					if int64(i) >= c.congestionHandler.div(MaxPacketResends) {
-						break resendLoop
+						return SendBufferCancel
 					}
 
-					packet := c.sendMap[key]
-
-					if currentTime-packet.sendTime > SendRemoveTimeout {
-						delete(c.sendMap, key)
+					if currentTime-data.sendTime > SendRemoveTimeout {
+						return SendBufferDelete
 					} else {
-						c.sendPacket(packet.packet, true)
+						c.sendPacket(data.packet, true)
 					}
-				}
 
-				c.sendMapMutex.Unlock()
+					return SendBufferContinue
+				})
 			}
 
 			if currentTime-c.lastSendTime > c.congestionHandler.mul(ReackTimeout) {
@@ -177,7 +165,7 @@ func (c *Connection) handlePacket(packet []byte) {
 	p := &Packet{}
 
 	if !p.Deserialize(packet) {
-		fmt.Println("error during packet deserialization")
+		fmt.Println("error during data deserialization")
 		return
 	}
 
@@ -248,17 +236,12 @@ func (c *Connection) handleOrderedPacket(packet *Packet) bool {
 func (c *Connection) handleAckPacket(packet *Packet) bool {
 	for i := sequenceNumber(0); i <= 32; i++ {
 		if i == 0 || packet.ackBits&(1<<(i-1)) != 0 {
-			key := packet.ack - i
+			s := packet.ack - i
 
-			c.sendMapMutex.Lock()
-
-			if p, ok := c.sendMap[key]; ok {
-				c.congestionHandler.check(p.sendTime)
-				delete(c.sendMap, key)
-				fmt.Println("#", key, "acked")
+			if packet, found := c.sendBuffer.Retrieve(s); found {
+				c.congestionHandler.check(packet.sendTime)
+				fmt.Println("#", s, "acked")
 			}
-
-			c.sendMapMutex.Unlock()
 		}
 	}
 
@@ -282,12 +265,7 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 				c.orderedSequence++
 			}
 
-			c.sendMapMutex.Lock()
-			c.sendMap[packet.sequence] = &sendPacket{
-				packet:   packet,
-				sendTime: currentTime(),
-			}
-			c.sendMapMutex.Unlock()
+			c.sendBuffer.Add(packet)
 		} else if packet.Flag(Ordered) {
 			packet.sequence = c.localUnreliableSequence
 			c.localUnreliableSequence++
@@ -300,7 +278,7 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 	}
 
 	if packet.Flag(Reliable) {
-		fmt.Print("send sequences #", packet.sequence)
+		fmt.Print("data sequences #", packet.sequence)
 		if resend {
 			fmt.Println(" resend")
 		} else {
