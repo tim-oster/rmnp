@@ -19,7 +19,10 @@ func NewSequenceBuffer(size sequenceNumber) *SequenceBuffer {
 }
 
 func (buffer *SequenceBuffer) reset() {
-	// TODO
+	for i := sequenceNumber(0); i < buffer.size; i++ {
+		buffer.sequences[i] = 0
+		buffer.states[i] = false
+	}
 }
 
 func (buffer *SequenceBuffer) Get(sequence sequenceNumber) bool {

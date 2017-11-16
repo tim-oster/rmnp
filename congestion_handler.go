@@ -5,7 +5,8 @@ import "fmt"
 type congestionMode uint8
 
 const (
-	Good congestionMode = iota
+	None congestionMode = iota
+	Good
 	Bad
 )
 
@@ -21,16 +22,16 @@ type congestionHandler struct {
 }
 
 func NewCongestionHandler() *congestionHandler {
-	return &congestionHandler{
-		mode:           Good,
-		lastChangeTime: currentTime(),
-		requiredTime:   DefaultCongestionRequiredTime,
-		multiplier:     1.0,
-	}
+	handler := new(congestionHandler)
+	handler.reset()
+	return handler
 }
 
 func (handler *congestionHandler) reset() {
-	// TODO
+	handler.mode = None
+	handler.rtt = 0
+	handler.requiredTime = DefaultCongestionRequiredTime
+	handler.unreliableCount = 0
 }
 
 func (handler *congestionHandler) check(sendTime int64) {
@@ -44,6 +45,8 @@ func (handler *congestionHandler) check(sendTime int64) {
 	}
 
 	switch handler.mode {
+	case None:
+		handler.changeMode(Good)
 	case Good:
 		if rtt > CongestionThreshold {
 			if time-handler.lastChangeTime <= BadRTTPunishTimeout {

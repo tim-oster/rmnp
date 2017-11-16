@@ -48,17 +48,20 @@ type Connection struct {
 	congestionHandler  *congestionHandler
 }
 
-func newConnection(impl *protocolImpl, addr *net.UDPAddr) *Connection {
+func newConnection() *Connection {
 	return &Connection{
-		protocol:          impl,
-		conn:              impl.socket,
-		addr:              addr,
 		state:             Disconnected,
 		orderedChain:      NewPacketChain(),
 		sendBuffer:        NewSendBuffer(),
 		receiveBuffer:     NewSequenceBuffer(SequenceBufferSize),
 		congestionHandler: NewCongestionHandler(),
 	}
+}
+
+func (c *Connection) init(impl *protocolImpl, addr *net.UDPAddr) {
+	c.protocol = impl
+	c.conn = impl.socket
+	c.addr = addr
 }
 
 func (c *Connection) reset() {

@@ -68,9 +68,7 @@ func (impl *protocolImpl) init(address string) {
 	}
 
 	impl.connectionPool = sync.Pool{
-		New: func() interface{} {
-			return nil
-		},
+		New: func() interface{} { return newConnection() },
 	}
 }
 
@@ -186,8 +184,8 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	hash := addrHash(addr)
 
-	// TODO pool?
-	connection := newConnection(impl, addr)
+	connection := impl.connectionPool.Get().(*Connection)
+	connection.init(impl, addr)
 
 	impl.connectionsMutex.Lock()
 	impl.connections[hash] = connection
