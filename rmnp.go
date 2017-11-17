@@ -52,7 +52,7 @@ type protocolImpl struct {
 	readFunc         ReadFunc
 	writeFunc        WriteFunc
 
-	packetPool     sync.Pool
+	bufferPool     sync.Pool
 	connectionPool sync.Pool
 
 	// callbacks
@@ -71,7 +71,7 @@ func (impl *protocolImpl) init(address string) {
 	impl.address = addr
 	impl.connections = make(map[uint16]*Connection)
 
-	impl.packetPool = sync.Pool{
+	impl.bufferPool = sync.Pool{
 		New: func() interface{} { return make([]byte, MTU) },
 	}
 
@@ -118,8 +118,7 @@ func (impl *protocolImpl) listen() {
 
 	go func(ctx context.Context) {
 		for {
-			// buffer is released in Connection#process
-			buffer := impl.packetPool.Get().([]byte)
+			buffer := impl.bufferPool.Get().([]byte)
 
 			impl.waitGroup.Add(1)
 			impl.socket.SetDeadline(time.Now().Add(time.Second))
@@ -128,7 +127,7 @@ func (impl *protocolImpl) listen() {
 
 			select {
 			case <-ctx.Done():
-				impl.packetPool.Put(buffer)
+				impl.bufferPool.Put(buffer)
 				return
 			default:
 			}
@@ -138,10 +137,13 @@ func (impl *protocolImpl) listen() {
 			}
 
 			go func(addr *net.UDPAddr, buffer []byte, length int) {
+				defer impl.bufferPool.Put(buffer)
+
 				impl.waitGroup.Add(1)
 				defer impl.waitGroup.Done()
 
-				packet := buffer[:length]
+				packet := make([]byte, length)
+				copy(packet, buffer[:length])
 
 				if !validateHeader(packet) {
 					fmt.Println("error during sending")

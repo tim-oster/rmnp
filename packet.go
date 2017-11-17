@@ -7,7 +7,6 @@ package rmnp
 import (
 	"encoding/binary"
 	"hash/crc32"
-	"sync"
 )
 
 type sequenceNumber uint16
@@ -24,10 +23,6 @@ const (
 	Connect
 	Disconnect
 )
-
-var packetPool = sync.Pool{
-	New: func() interface{} { return new(Packet) },
-}
 
 type Packet struct {
 	protocolId byte
@@ -46,15 +41,6 @@ type Packet struct {
 
 	// body
 	data []byte
-}
-
-func NewPacket() *Packet {
-	return packetPool.Get().(*Packet)
-}
-
-func ReleasePacket(packet *Packet) {
-	packet.data = nil
-	packetPool.Put(packet)
 }
 
 func (p *Packet) Serialize() []byte {
