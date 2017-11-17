@@ -13,7 +13,8 @@ import (
 )
 
 type ConnectionCallback func(*Connection)
-type PacketCallback func(*Connection, *net.UDPAddr, []byte) bool
+type ValidationCallback func(*Connection, *net.UDPAddr, []byte) bool
+type PacketCallback func(*Connection, *Packet)
 
 func invokeConnectionCallback(callback ConnectionCallback, connection *Connection) {
 	if callback != nil {
@@ -21,12 +22,18 @@ func invokeConnectionCallback(callback ConnectionCallback, connection *Connectio
 	}
 }
 
-func invokePacketCallback(callback PacketCallback, connection *Connection, addr *net.UDPAddr, packet []byte) bool {
+func invokeValidationCallback(callback ValidationCallback, connection *Connection, addr *net.UDPAddr, packet []byte) bool {
 	if callback != nil {
 		return callback(connection, addr, packet)
 	}
 
 	return true
+}
+
+func invokePacketCallback(callback PacketCallback, connection *Connection, packet *Packet) {
+	if callback != nil {
+		callback(connection, packet)
+	}
 }
 
 type ReadFunc func(*net.UDPConn, []byte) (int, *net.UDPAddr, bool)
@@ -53,7 +60,8 @@ type protocolImpl struct {
 	onConnect    ConnectionCallback
 	onDisconnect ConnectionCallback
 	onTimeout    ConnectionCallback
-	onValidation PacketCallback
+	onValidation ValidationCallback
+	onPacket     PacketCallback
 }
 
 func (impl *protocolImpl) init(address string) {
@@ -95,6 +103,7 @@ func (impl *protocolImpl) destroy() {
 	impl.onDisconnect = nil
 	impl.onTimeout = nil
 	impl.onValidation = nil
+	impl.onPacket = nil
 }
 
 func (impl *protocolImpl) setSocket(socket *net.UDPConn, err error) {
@@ -109,6 +118,7 @@ func (impl *protocolImpl) listen() {
 
 	go func(ctx context.Context) {
 		for {
+			// buffer is released in Connection#ProcessPacket
 			buffer := impl.packetPool.Get().([]byte)
 
 			impl.waitGroup.Add(1)
@@ -131,7 +141,6 @@ func (impl *protocolImpl) listen() {
 				impl.waitGroup.Add(1)
 				defer impl.waitGroup.Done()
 
-				defer impl.packetPool.Put(buffer)
 				packet := buffer[:length]
 
 				if !validateHeader(packet) {
@@ -159,7 +168,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		}
 
 		header := headerSize(packet)
-		if !invokePacketCallback(impl.onValidation, nil, addr, packet[header:]) {
+		if !invokeValidationCallback(impl.onValidation, nil, addr, packet[header:]) {
 			fmt.Println("connection rejected")
 			return
 		}
@@ -178,7 +187,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		return
 	}
 
-	connection.handlePacket(packet)
+	connection.ProcessPacket(packet)
 }
 
 func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {

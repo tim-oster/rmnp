@@ -54,6 +54,10 @@ func NewClient(server string) *Client {
 		return false
 	}
 
+	c.onPacket = func(connection *Connection, packet *Packet) {
+		fmt.Println(string(packet.data))
+	}
+
 	c.init(server)
 	return c
 }
@@ -71,12 +75,32 @@ func (c *Client) Disconnect() {
 
 // TODO tmp
 func (c *Client) Send() {
+	/*
 	for {
 		if c.stop {
 			break
 		}
 
-		c.server.sendLowLevelPacket(Reliable)
+		c.server.sendPacket(&Packet{
+			descriptor: Reliable,
+			data:       []byte("hi"),
+		}, false)
 		time.Sleep(500 * time.Millisecond)
-	}
+	}*/
+
+	time.Sleep(500 * time.Millisecond)
+
+	c.testSend(1)
+	c.testSend(4)
+	c.testSend(3)
+	c.testSend(2)
+	c.testSend(0)
+}
+
+func (c *Client) testSend(id byte) {
+	c.server.sendPacket(&Packet{
+		descriptor: Reliable | Ordered,
+		order:      orderNumber(id),
+		data:       []byte{id},
+	}, false)
 }

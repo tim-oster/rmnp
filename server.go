@@ -46,6 +46,10 @@ func NewServer(address string) *Server {
 		return true
 	}
 
+	s.onPacket = func(connection *Connection, packet *Packet) {
+		fmt.Println(packet.data)
+	}
+
 	s.init(address)
 	return s
 }

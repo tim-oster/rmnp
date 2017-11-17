@@ -161,11 +161,17 @@ func (c *Connection) keepAlive(ctx context.Context) {
 	}
 }
 
-func (c *Connection) handlePacket(packet []byte) {
+func (c *Connection) ProcessPacket(packet []byte) {
+	defer c.protocol.packetPool.Put(packet)
+
 	c.lastReceivedTime = currentTime()
 
-	// TODO pool?
-	p := &Packet{}
+	p := NewPacket()
+	defer ReleasePacket(p)
+
+	if size := headerSize(packet); len(packet)-size > 0 {
+		p.data = packet[size:]
+	}
 
 	if !p.Deserialize(packet) {
 		fmt.Println("error during data deserialization")
@@ -184,7 +190,9 @@ func (c *Connection) handlePacket(packet []byte) {
 		return
 	}
 
-	// TODO process
+	if p.data != nil {
+		c.process(p)
+	}
 }
 
 func (c *Connection) handleReliablePacket(packet *Packet) bool {
@@ -220,12 +228,9 @@ func (c *Connection) handleOrderedPacket(packet *Packet) bool {
 	if packet.Flag(Reliable) {
 		c.orderedChain.Chain(packet)
 
-		// tmp
-		c.orderedChain.PopConsecutive()
-
-		/*for _, p := range c.orderedChain.PopConsecutive() {
-			// TODO process
-		}*/
+		for l := c.orderedChain.PopConsecutive(); l != nil; l = l.next {
+			c.process(l.packet)
+		}
 	} else {
 		if greaterThanSequence(packet.sequence, c.remoteUnreliableSequence) {
 			c.remoteUnreliableSequence = packet.sequence
@@ -251,7 +256,13 @@ func (c *Connection) handleAckPacket(packet *Packet) bool {
 	return true
 }
 
+func (c *Connection) process(packet *Packet) {
+	invokePacketCallback(c.protocol.onPacket, c, packet)
+}
+
 func (c *Connection) sendPacket(packet *Packet, resend bool) {
+	defer ReleasePacket(packet)
+
 	if !packet.Flag(Reliable) && c.congestionHandler.shouldDrop() {
 		return
 	}
@@ -264,7 +275,7 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 			c.localSequence++
 
 			if packet.Flag(Ordered) {
-				packet.order = c.orderedSequence
+				//packet.order = c.orderedSequence
 				c.orderedSequence++
 			}
 
@@ -297,7 +308,9 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 }
 
 func (c *Connection) sendLowLevelPacket(descriptor descriptor) {
-	c.sendPacket(&Packet{descriptor: descriptor}, false)
+	packet := NewPacket()
+	packet.descriptor = descriptor
+	c.sendPacket(packet, false)
 }
 
 func (c *Connection) sendAckPacket() {

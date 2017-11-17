@@ -7,6 +7,7 @@ package rmnp
 import (
 	"encoding/binary"
 	"hash/crc32"
+	"sync"
 )
 
 type sequenceNumber uint16
@@ -24,6 +25,10 @@ const (
 	Disconnect
 )
 
+var packetPool = sync.Pool{
+	New: func() interface{} { return new(Packet) },
+}
+
 type Packet struct {
 	protocolId byte
 	crc32      uint32
@@ -38,10 +43,21 @@ type Packet struct {
 	// only contained in Ack packets
 	ack     sequenceNumber
 	ackBits uint32
+
+	// body
+	data []byte
+}
+
+func NewPacket() *Packet {
+	return packetPool.Get().(*Packet)
+}
+
+func ReleasePacket(packet *Packet) {
+	packet.data = nil
+	packetPool.Put(packet)
 }
 
 func (p *Packet) Serialize() []byte {
-	// TODO pool?
 	s := NewSerializer()
 
 	s.Write(p.protocolId)
@@ -59,6 +75,10 @@ func (p *Packet) Serialize() []byte {
 	if p.Flag(Ack) {
 		s.Write(p.ack)
 		s.Write(p.ackBits)
+	}
+
+	if p.data != nil && len(p.data) > 0 {
+		s.Write(p.data)
 	}
 
 	return s.Bytes()
@@ -92,6 +112,11 @@ func (p *Packet) Deserialize(packet []byte) bool {
 		if s.Read(&p.ackBits) != nil {
 			return false
 		}
+	}
+
+	if size := s.RemainingSize(); size > 0 {
+		p.data = make([]byte, size)
+		s.Read(&p.data)
 	}
 
 	return true

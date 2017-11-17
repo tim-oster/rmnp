@@ -32,3 +32,7 @@ func (s *Serializer) Write(data interface{}) error {
 func (s *Serializer) Bytes() []byte {
 	return s.buffer.Bytes()
 }
+
+func (s *Serializer) RemainingSize() int {
+	return s.buffer.Len()
+}
