@@ -4,10 +4,13 @@
 
 package rmnp
 
+import "sync"
+
 type SequenceBuffer struct {
 	size      sequenceNumber
 	sequences []sequenceNumber
 	states    []bool
+	mutex     sync.Mutex
 }
 
 func NewSequenceBuffer(size sequenceNumber) *SequenceBuffer {
@@ -19,6 +22,9 @@ func NewSequenceBuffer(size sequenceNumber) *SequenceBuffer {
 }
 
 func (buffer *SequenceBuffer) reset() {
+	buffer.mutex.Lock()
+	defer buffer.mutex.Unlock()
+
 	for i := sequenceNumber(0); i < buffer.size; i++ {
 		buffer.sequences[i] = 0
 		buffer.states[i] = false
@@ -26,6 +32,9 @@ func (buffer *SequenceBuffer) reset() {
 }
 
 func (buffer *SequenceBuffer) Get(sequence sequenceNumber) bool {
+	buffer.mutex.Lock()
+	defer buffer.mutex.Unlock()
+
 	if sequence < 0 {
 		sequence += buffer.size
 	}
@@ -38,6 +47,9 @@ func (buffer *SequenceBuffer) Get(sequence sequenceNumber) bool {
 }
 
 func (buffer *SequenceBuffer) Set(sequence sequenceNumber, value bool) {
+	buffer.mutex.Lock()
+	defer buffer.mutex.Unlock()
+	
 	if sequence < 0 {
 		sequence += buffer.size
 	}

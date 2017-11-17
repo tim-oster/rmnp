@@ -37,7 +37,6 @@ func NewClient(server string) *Client {
 
 	c.onDisconnect = func(connection *Connection) {
 		fmt.Println("disconnected from server")
-		c.stop = true
 		c.destroy()
 	}
 
