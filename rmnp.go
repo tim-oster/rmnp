@@ -118,7 +118,7 @@ func (impl *protocolImpl) listen() {
 
 	go func(ctx context.Context) {
 		for {
-			// buffer is released in Connection#ProcessPacket
+			// buffer is released in Connection#process
 			buffer := impl.packetPool.Get().([]byte)
 
 			impl.waitGroup.Add(1)

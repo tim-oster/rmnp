@@ -40,7 +40,7 @@ func (chain *packetChain) Chain(packet *Packet) {
 	defer chain.mutex.Unlock()
 
 	if chain.start == nil {
-		chain.start = &chainLink{packet: packet}
+		chain.start = &chainLink{next: nil, packet: packet}
 	} else {
 		var link *chainLink = nil
 
@@ -74,6 +74,7 @@ func (chain *packetChain) PopConsecutive() *chainLink {
 
 	for l := chain.start; l != nil; l = l.next {
 		if l.packet.order == chain.next {
+			chain.length--
 			chain.next++
 			last = l
 		} else {

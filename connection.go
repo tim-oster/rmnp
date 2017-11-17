@@ -162,12 +162,10 @@ func (c *Connection) keepAlive(ctx context.Context) {
 }
 
 func (c *Connection) ProcessPacket(packet []byte) {
-	defer c.protocol.packetPool.Put(packet)
-
 	c.lastReceivedTime = currentTime()
 
+	// released in connection#process
 	p := NewPacket()
-	defer ReleasePacket(p)
 
 	if size := headerSize(packet); len(packet)-size > 0 {
 		p.data = packet[size:]
@@ -258,10 +256,12 @@ func (c *Connection) handleAckPacket(packet *Packet) bool {
 
 func (c *Connection) process(packet *Packet) {
 	invokePacketCallback(c.protocol.onPacket, c, packet)
+	c.protocol.packetPool.Put(packet.data)
+	ReleasePacket(packet)
 }
 
 func (c *Connection) sendPacket(packet *Packet, resend bool) {
-	defer ReleasePacket(packet)
+	//defer ReleasePacket(packet) TODO
 
 	if !packet.Flag(Reliable) && c.congestionHandler.shouldDrop() {
 		return
@@ -275,7 +275,7 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 			c.localSequence++
 
 			if packet.Flag(Ordered) {
-				//packet.order = c.orderedSequence
+				packet.order = c.orderedSequence
 				c.orderedSequence++
 			}
 
