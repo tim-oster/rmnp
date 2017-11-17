@@ -142,13 +142,15 @@ func (impl *protocolImpl) listen() {
 				impl.waitGroup.Add(1)
 				defer impl.waitGroup.Done()
 
-				packet := make([]byte, length)
-				copy(packet, buffer[:length])
+				sizedBuffer := buffer[:length]
 
-				if !validateHeader(packet) {
+				if !validateHeader(sizedBuffer) {
 					fmt.Println("error during sending")
 					return
 				}
+
+				packet := make([]byte, length)
+				copy(packet, sizedBuffer)
 
 				impl.handlePacket(addr, packet)
 			}(addr, buffer, length)
