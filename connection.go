@@ -96,68 +96,66 @@ func (c *Connection) startRoutines() {
 }
 
 func (c *Connection) update(ctx context.Context) {
+	c.protocol.waitGroup.Add(1)
+	defer c.protocol.waitGroup.Done()
+
+loop:
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			break loop
 		case <-time.After(UpdateLoopInterval * time.Millisecond):
 		}
 
-		func() {
-			c.protocol.waitGroup.Add(1)
-			defer c.protocol.waitGroup.Done()
+		currentTime := currentTime()
 
-			currentTime := currentTime()
+		if currentTime-c.lastResendTime > c.congestionHandler.mul(ResendTimeout) {
+			c.lastResendTime = currentTime
 
-			if currentTime-c.lastResendTime > c.congestionHandler.mul(ResendTimeout) {
-				c.lastResendTime = currentTime
-
-				c.sendBuffer.Iterate(func(i int, data *sendPacket) SendBufferOP {
-					if int64(i) >= c.congestionHandler.div(MaxPacketResends) {
-						return SendBufferCancel
-					}
-
-					if currentTime-data.sendTime > SendRemoveTimeout {
-						return SendBufferDelete
-					} else {
-						c.sendPacket(data.packet, true)
-					}
-
-					return SendBufferContinue
-				})
-			}
-
-			if currentTime-c.lastSendTime > c.congestionHandler.mul(ReackTimeout) {
-				c.sendAckPacket()
-
-				if c.pingPacketInterval%AutoPingInterval == 0 {
-					c.sendLowLevelPacket(Reliable)
+			c.sendBuffer.Iterate(func(i int, data *sendPacket) SendBufferOP {
+				if int64(i) >= c.congestionHandler.div(MaxPacketResends) {
+					return SendBufferCancel
 				}
 
-				c.pingPacketInterval++
+				if currentTime-data.sendTime > SendRemoveTimeout {
+					return SendBufferDelete
+				} else {
+					c.sendPacket(data.packet, true)
+				}
+
+				return SendBufferContinue
+			})
+		}
+
+		if currentTime-c.lastSendTime > c.congestionHandler.mul(ReackTimeout) {
+			c.sendAckPacket()
+
+			if c.pingPacketInterval%AutoPingInterval == 0 {
+				c.sendLowLevelPacket(Reliable)
 			}
-		}()
+
+			c.pingPacketInterval++
+		}
 	}
 }
 
 func (c *Connection) keepAlive(ctx context.Context) {
+	c.protocol.waitGroup.Add(1)
+	defer c.protocol.waitGroup.Done()
+
+loop:
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			break loop
 		case <-time.After(TimeoutThreshold * time.Millisecond / 2):
 		}
 
-		func() {
-			c.protocol.waitGroup.Add(1)
-			defer c.protocol.waitGroup.Done()
+		currentTime := currentTime()
 
-			currentTime := currentTime()
-
-			if currentTime-c.lastReceivedTime > TimeoutThreshold || c.GetPing() > MaxPing {
-				c.protocol.timeoutClient(c)
-			}
-		}()
+		if currentTime-c.lastReceivedTime > TimeoutThreshold || c.GetPing() > MaxPing {
+			c.protocol.timeoutClient(c)
+		}
 	}
 }
 

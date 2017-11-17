@@ -7,16 +7,11 @@ package rmnp
 import (
 	"net"
 	"fmt"
-	"time"
 )
 
 type Client struct {
 	protocolImpl
-
 	server *Connection
-
-	// TODO tmp
-	stop bool
 }
 
 func NewClient(server string) *Client {
@@ -71,36 +66,4 @@ func (c *Client) Connect() {
 func (c *Client) Disconnect() {
 	c.destroy()
 	c.server = nil
-}
-
-// TODO tmp
-func (c *Client) Send() {
-	/*
-	for {
-		if c.stop {
-			break
-		}
-
-		c.server.sendPacket(&Packet{
-			descriptor: Reliable,
-			data:       []byte("hi"),
-		}, false)
-		time.Sleep(500 * time.Millisecond)
-	}*/
-
-	time.Sleep(500 * time.Millisecond)
-
-	c.testSend(1)
-	c.testSend(4)
-	c.testSend(3)
-	c.testSend(2)
-	c.testSend(0)
-}
-
-func (c *Client) testSend(id byte) {
-	c.server.sendPacket(&Packet{
-		descriptor: Reliable | Ordered,
-		order:      orderNumber(id),
-		data:       []byte{id},
-	}, false)
 }
