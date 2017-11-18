@@ -185,7 +185,7 @@ func (c *Connection) keepAlive(ctx context.Context) {
 func (c *Connection) processReceive(packet []byte) {
 	c.lastReceivedTime = currentTime()
 
-	p := &Packet{}
+	p := new(Packet)
 
 	if size := headerSize(packet); len(packet)-size > 0 {
 		p.data = packet[size:]
