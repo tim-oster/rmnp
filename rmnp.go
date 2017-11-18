@@ -116,49 +116,52 @@ func (impl *protocolImpl) setSocket(socket *net.UDPConn, err error) {
 func (impl *protocolImpl) listen() {
 	impl.ctx, impl.cancel = context.WithCancel(context.Background())
 
-	go func(ctx context.Context) {
-		for {
-			buffer := impl.bufferPool.Get().([]byte)
+	for i := 0; i < ParallelListenerCount; i++ {
+		go impl.listeningWorker()
+	}
+}
 
-			impl.waitGroup.Add(1)
+func (impl *protocolImpl) listeningWorker() {
+	impl.waitGroup.Add(1)
+	defer impl.waitGroup.Done()
+
+	for {
+		select {
+		case <-impl.ctx.Done():
+			return
+		default:
+		}
+
+		func() {
+			buffer := impl.bufferPool.Get().([]byte)
+			defer impl.bufferPool.Put(buffer)
+
 			impl.socket.SetDeadline(time.Now().Add(time.Second))
 			length, addr, next := impl.readFunc(impl.socket, buffer)
-			impl.waitGroup.Done()
-
-			select {
-			case <-ctx.Done():
-				impl.bufferPool.Put(buffer)
-				return
-			default:
-			}
 
 			if !next {
-				continue
+				return
 			}
 
-			go func(addr *net.UDPAddr, buffer []byte, length int) {
-				defer impl.bufferPool.Put(buffer)
+			sizedBuffer := buffer[:length]
 
-				impl.waitGroup.Add(1)
-				defer impl.waitGroup.Done()
+			if !validateHeader(sizedBuffer) {
+				fmt.Println("error during sending")
+				return
+			}
 
-				sizedBuffer := buffer[:length]
+			packet := make([]byte, length)
+			copy(packet, sizedBuffer)
 
-				if !validateHeader(sizedBuffer) {
-					fmt.Println("error during sending")
-					return
-				}
-
-				packet := make([]byte, length)
-				copy(packet, sizedBuffer)
-
-				impl.handlePacket(addr, packet)
-			}(addr, buffer, length)
-		}
-	}(impl.ctx)
+			go impl.handlePacket(addr, packet)
+		}()
+	}
 }
 
 func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
+	impl.waitGroup.Add(1)
+	defer impl.waitGroup.Done()
+
 	hash := addrHash(addr)
 
 	impl.connectionsMutex.RLock()
@@ -191,7 +194,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		return
 	}
 
-	connection.ProcessPacket(packet)
+	connection.receiveQueue <- packet
 }
 
 func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
@@ -216,8 +219,14 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	}
 
 	connection.state = Disconnected
-	connection.sendLowLevelPacket(Reliable | Disconnect)
+
+	// NOTE: send more than necessary so that the packet hopefully arrives
+	for i := 0; i < 10; i++ {
+		connection.sendLowLevelPacket(Reliable | Disconnect)
+	}
+
 	connection.stopRoutines()
+	connection.waitGroup.Wait()
 
 	hash := addrHash(connection.addr)
 

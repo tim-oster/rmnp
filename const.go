@@ -11,6 +11,9 @@ const (
 	MaxSkippedPackets = 25
 	MaxPacketResends  = 15
 
+	ParallelListenerCount   = 4
+	MaxSendReceiveQueueSize = 100
+
 	// size needs to ensure that every slot in buffers is at least overwritten 2 times, otherwise acks will fail (max_sequence % size > 32 && max_sequence / size >= 2)
 	SequenceBufferSize = 200
 
@@ -20,7 +23,7 @@ const (
 	ResendTimeout      = 50
 	SendRemoveTimeout  = 1600
 
-	TimeoutThreshold = 8000
+	TimeoutThreshold = 4000
 	MaxPing          = 150
 
 	RTTSmoothFactor               = 0.1

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 	"context"
+	"sync"
 )
 
 type connectionState uint8
@@ -30,8 +31,8 @@ type Connection struct {
 
 	// for Reliable packets
 	localSequence   sequenceNumber
-	remoteSequence  sequenceNumber
-	ackBits         uint32
+	remoteSequence  sequenceNumber // TODO atomic
+	ackBits         uint32         // TODO atomic
 	orderedChain    *packetChain
 	orderedSequence orderNumber
 
@@ -46,6 +47,10 @@ type Connection struct {
 	sendBuffer         *sendBuffer
 	receiveBuffer      *SequenceBuffer
 	congestionHandler  *congestionHandler
+
+	sendQueue    chan *Packet
+	receiveQueue chan []byte
+	waitGroup    sync.WaitGroup
 }
 
 func newConnection() *Connection {
@@ -55,6 +60,8 @@ func newConnection() *Connection {
 		sendBuffer:        NewSendBuffer(),
 		receiveBuffer:     NewSequenceBuffer(SequenceBufferSize),
 		congestionHandler: NewCongestionHandler(),
+		sendQueue:         make(chan *Packet, MaxSendReceiveQueueSize),
+		receiveQueue:      make(chan []byte, MaxSendReceiveQueueSize),
 	}
 }
 
@@ -91,20 +98,22 @@ func (c *Connection) reset() {
 
 func (c *Connection) startRoutines() {
 	c.ctx, c.stopRoutines = context.WithCancel(context.Background())
-	go c.update(c.ctx)
+	go c.sendUpdate(c.ctx)
+	go c.receiveUpdate(c.ctx)
 	go c.keepAlive(c.ctx)
 }
 
-func (c *Connection) update(ctx context.Context) {
-	c.protocol.waitGroup.Add(1)
-	defer c.protocol.waitGroup.Done()
+func (c *Connection) sendUpdate(ctx context.Context) {
+	c.waitGroup.Add(1)
+	defer c.waitGroup.Done()
 
-loop:
 	for {
 		select {
-		case <-ctx.Done():
-			break loop
 		case <-time.After(UpdateLoopInterval * time.Millisecond):
+		case <-ctx.Done():
+			return
+		case packet := <-c.sendQueue:
+			c.processSend(packet, false)
 		}
 
 		currentTime := currentTime()
@@ -120,7 +129,7 @@ loop:
 				if currentTime-data.sendTime > SendRemoveTimeout {
 					return SendBufferDelete
 				} else {
-					c.sendPacket(data.packet, true)
+					c.processSend(data.packet, true)
 				}
 
 				return SendBufferContinue
@@ -132,6 +141,7 @@ loop:
 
 			if c.pingPacketInterval%AutoPingInterval == 0 {
 				c.sendLowLevelPacket(Reliable)
+				c.pingPacketInterval = 0
 			}
 
 			c.pingPacketInterval++
@@ -139,15 +149,28 @@ loop:
 	}
 }
 
-func (c *Connection) keepAlive(ctx context.Context) {
-	c.protocol.waitGroup.Add(1)
-	defer c.protocol.waitGroup.Done()
+func (c *Connection) receiveUpdate(ctx context.Context) {
+	c.waitGroup.Add(1)
+	defer c.waitGroup.Done()
 
-loop:
 	for {
 		select {
 		case <-ctx.Done():
-			break loop
+			return
+		case packet := <-c.receiveQueue:
+			c.processReceive(packet)
+		}
+	}
+}
+
+func (c *Connection) keepAlive(ctx context.Context) {
+	c.waitGroup.Add(1)
+	defer c.waitGroup.Done()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
 		case <-time.After(TimeoutThreshold * time.Millisecond / 2):
 		}
 
@@ -159,7 +182,7 @@ loop:
 	}
 }
 
-func (c *Connection) ProcessPacket(packet []byte) {
+func (c *Connection) processReceive(packet []byte) {
 	c.lastReceivedTime = currentTime()
 
 	p := &Packet{}
@@ -198,15 +221,15 @@ func (c *Connection) handleReliablePacket(packet *Packet) bool {
 		return false
 	}
 
-	// update receive states
+	// sendUpdate receive states
 	c.receiveBuffer.Set(packet.sequence, true)
 
-	// update remote sequences number
+	// sendUpdate remote sequences number
 	if greaterThanSequence(packet.sequence, c.remoteSequence) && differenceSequence(packet.sequence, c.remoteSequence) <= MaxSkippedPackets {
 		c.remoteSequence = packet.sequence
 	}
 
-	// update ack bit mask for last 32 packets
+	// sendUpdate ack bit mask for last 32 packets
 	c.ackBits = 0
 	for i := sequenceNumber(1); i <= 32; i++ {
 		if c.receiveBuffer.Get(c.remoteSequence - i) {
@@ -255,7 +278,7 @@ func (c *Connection) process(packet *Packet) {
 	invokePacketCallback(c.protocol.onPacket, c, packet)
 }
 
-func (c *Connection) sendPacket(packet *Packet, resend bool) {
+func (c *Connection) processSend(packet *Packet, resend bool) {
 	if !packet.Flag(Reliable) && c.congestionHandler.shouldDrop() {
 		return
 	}
@@ -300,8 +323,12 @@ func (c *Connection) sendPacket(packet *Packet, resend bool) {
 	c.lastSendTime = currentTime()
 }
 
+func (c *Connection) SendPacket(packet *Packet) {
+	c.sendQueue <- packet
+}
+
 func (c *Connection) sendLowLevelPacket(descriptor descriptor) {
-	c.sendPacket(&Packet{descriptor: descriptor}, false)
+	c.SendPacket(&Packet{descriptor: descriptor})
 }
 
 func (c *Connection) sendAckPacket() {
