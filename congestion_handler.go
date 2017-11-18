@@ -28,7 +28,7 @@ func NewCongestionHandler() *congestionHandler {
 }
 
 func (handler *congestionHandler) reset() {
-	handler.mode = None
+	handler.changeMode(None)
 	handler.rtt = 0
 	handler.requiredTime = DefaultCongestionRequiredTime
 	handler.unreliableCount = 0
@@ -71,6 +71,8 @@ func (handler *congestionHandler) check(sendTime int64) {
 
 func (handler *congestionHandler) changeMode(mode congestionMode) {
 	switch mode {
+	case None:
+		fallthrough
 	case Good:
 		handler.multiplier = 1.0
 		fmt.Println("============================> congestion mode: good")

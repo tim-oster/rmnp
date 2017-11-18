@@ -184,7 +184,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	}
 
 	// done this way to ensure that connect callback is executed on client-side
-	if connection.state == Disconnected && descriptor(packet[5])&Connect != 0 {
+	if connection.state != Connected && descriptor(packet[5])&Connect != 0 {
 		invokeConnectionCallback(impl.onConnect, connection)
 		connection.state = Connected
 	}
@@ -224,6 +224,9 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	for i := 0; i < 10; i++ {
 		connection.sendLowLevelPacket(Reliable | Disconnect)
 	}
+
+	// NOTE: give the channel some time to process the packets
+	time.Sleep(20 * time.Millisecond)
 
 	connection.stopRoutines()
 	connection.waitGroup.Wait()

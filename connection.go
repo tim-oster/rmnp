@@ -16,6 +16,7 @@ type connectionState uint8
 
 const (
 	Disconnected connectionState = iota
+	Connecting
 	Connected
 )
 
@@ -31,8 +32,8 @@ type Connection struct {
 
 	// for Reliable packets
 	localSequence   sequenceNumber
-	remoteSequence  sequenceNumber // TODO atomic
-	ackBits         uint32         // TODO atomic
+	remoteSequence  sequenceNumber
+	ackBits         uint32
 	orderedChain    *packetChain
 	orderedSequence orderNumber
 
@@ -69,6 +70,12 @@ func (c *Connection) init(impl *protocolImpl, addr *net.UDPAddr) {
 	c.protocol = impl
 	c.conn = impl.socket
 	c.addr = addr
+	c.state = Connecting
+
+	t := currentTime()
+	c.lastSendTime = t
+	c.lastResendTime = t
+	c.lastReceivedTime = t
 }
 
 func (c *Connection) reset() {
@@ -136,6 +143,10 @@ func (c *Connection) sendUpdate(ctx context.Context) {
 			})
 		}
 
+		if c.state != Connected {
+			continue
+		}
+
 		if currentTime-c.lastSendTime > c.congestionHandler.mul(ReackTimeout) {
 			c.sendAckPacket()
 
@@ -174,10 +185,16 @@ func (c *Connection) keepAlive(ctx context.Context) {
 		case <-time.After(TimeoutThreshold * time.Millisecond / 2):
 		}
 
+		if c.state == Disconnected {
+			continue
+		}
+
 		currentTime := currentTime()
 
 		if currentTime-c.lastReceivedTime > TimeoutThreshold || c.GetPing() > MaxPing {
-			c.protocol.timeoutClient(c)
+			// NOTE: needs to be executed in goroutine; otherwise this method could not exit and therefore deadlock
+			// the connection's waitGroup
+			go c.protocol.timeoutClient(c)
 		}
 	}
 }
