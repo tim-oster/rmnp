@@ -157,17 +157,12 @@ func (impl *protocolImpl) listeningWorker() {
 			packet := make([]byte, length)
 			copy(packet, sizedBuffer)
 
-			go impl.handlePacket(addr, packet)
+			impl.handlePacket(addr, packet)
 		}()
 	}
 }
 
 func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
-	defer antiPanic(nil)
-
-	impl.waitGroup.Add(1)
-	defer impl.waitGroup.Done()
-
 	hash := addrHash(addr)
 
 	impl.connectionsMutex.RLock()
