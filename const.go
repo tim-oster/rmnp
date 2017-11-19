@@ -9,7 +9,6 @@ const (
 	ProtocolId = 231
 
 	MaxSkippedPackets = 25
-	MaxPacketResends  = 15
 
 	ParallelListenerCount   = 4
 	MaxSendReceiveQueueSize = 100
@@ -18,20 +17,28 @@ const (
 	SequenceBufferSize = 200
 
 	UpdateLoopInterval = 10
-	ReackTimeout       = 50
 	AutoPingInterval   = 15
-	ResendTimeout      = 50
 	SendRemoveTimeout  = 1600
 
 	TimeoutThreshold = 4000
 	MaxPing          = 150
 
 	RTTSmoothFactor               = 0.1
-	BadModeMultiplier             = 2.5
 	CongestionThreshold           = 250
 	GoodRTTRewardInterval         = 10 * 1000
 	BadRTTPunishTimeout           = 10 * 1000
 	MaxCongestionRequiredTime     = 60 * 1000
 	DefaultCongestionRequiredTime = 4 * 1000
 	CongestionPacketReduction     = 4
+)
+
+// super annoying but golang does not allow to cast float to int if the variable is declared as static for some reason
+var (
+	BadModeMultiplier         = 2.5
+	ResendTimeout       int64 = 50
+	MaxPacketResends    int64 = 15
+	ReackTimeout        int64 = 50
+	BadResendTimeout          = int64(float64(ResendTimeout) * BadModeMultiplier)
+	BadMaxPacketResends       = int64(float64(MaxPacketResends) / BadModeMultiplier)
+	BadReackTimeout           = int64(float64(ReackTimeout) * BadModeMultiplier)
 )

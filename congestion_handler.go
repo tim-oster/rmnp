@@ -17,8 +17,11 @@ type congestionHandler struct {
 	lastChangeTime int64
 	requiredTime   int64
 
-	multiplier      float32
 	unreliableCount byte
+
+	ResendTimeout    int64
+	MaxPacketResends int64
+	ReackTimeout     int64
 }
 
 func NewCongestionHandler() *congestionHandler {
@@ -74,10 +77,14 @@ func (handler *congestionHandler) changeMode(mode congestionMode) {
 	case None:
 		fallthrough
 	case Good:
-		handler.multiplier = 1.0
+		handler.ResendTimeout = ResendTimeout
+		handler.MaxPacketResends = MaxPacketResends
+		handler.ReackTimeout = ReackTimeout
 		fmt.Println("============================> congestion mode: good")
 	case Bad:
-		handler.multiplier = BadModeMultiplier
+		handler.ResendTimeout = BadResendTimeout
+		handler.MaxPacketResends = BadMaxPacketResends
+		handler.ReackTimeout = BadReackTimeout
 		fmt.Println("============================> congestion mode: bad")
 	}
 
@@ -85,15 +92,8 @@ func (handler *congestionHandler) changeMode(mode congestionMode) {
 	handler.lastChangeTime = currentTime()
 }
 
-func (handler *congestionHandler) div(i int64) int64 {
-	return int64(float32(i) / handler.multiplier)
-}
-
-func (handler *congestionHandler) mul(i int64) int64 {
-	return int64(float32(i) * handler.multiplier)
-}
-
-func (handler *congestionHandler) shouldDrop() bool {
+// for unreliable packets only
+func (handler *congestionHandler) shouldDropUnreliable() bool {
 	switch handler.mode {
 	case Good:
 		return false

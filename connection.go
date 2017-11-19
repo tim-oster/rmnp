@@ -136,11 +136,11 @@ func (c *Connection) sendUpdate() {
 
 		currentTime := currentTime()
 
-		if currentTime-c.lastResendTime > c.congestionHandler.mul(ResendTimeout) {
+		if currentTime-c.lastResendTime > c.congestionHandler.ResendTimeout {
 			c.lastResendTime = currentTime
 
 			c.sendBuffer.Iterate(func(i int, data *sendPacket) SendBufferOP {
-				if int64(i) >= c.congestionHandler.div(MaxPacketResends) {
+				if int64(i) >= c.congestionHandler.MaxPacketResends {
 					return SendBufferCancel
 				}
 
@@ -158,7 +158,7 @@ func (c *Connection) sendUpdate() {
 			continue
 		}
 
-		if currentTime-c.lastSendTime > c.congestionHandler.mul(ReackTimeout) {
+		if currentTime-c.lastSendTime > c.congestionHandler.ReackTimeout {
 			c.sendAckPacket()
 
 			if c.pingPacketInterval%AutoPingInterval == 0 {
@@ -317,7 +317,7 @@ func (c *Connection) process(packet *Packet) {
 }
 
 func (c *Connection) processSend(packet *Packet, resend bool) {
-	if !packet.Flag(Reliable) && c.congestionHandler.shouldDrop() {
+	if !packet.Flag(Reliable) && c.congestionHandler.shouldDropUnreliable() {
 		return
 	}
 
