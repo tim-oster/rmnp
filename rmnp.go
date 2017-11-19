@@ -220,12 +220,13 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 
 	connection.state = Disconnected
 
-	// NOTE: send more than necessary so that the packet hopefully arrives
+	// send more than necessary so that the packet hopefully arrives
 	for i := 0; i < 10; i++ {
+		// TODO reliable?
 		connection.sendLowLevelPacket(Reliable | Disconnect)
 	}
 
-	// NOTE: give the channel some time to process the packets
+	// give the channel some time to process the packets
 	time.Sleep(20 * time.Millisecond)
 
 	connection.stopRoutines()

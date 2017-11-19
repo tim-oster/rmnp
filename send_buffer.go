@@ -13,6 +13,7 @@ const (
 type sendPacket struct {
 	packet   *Packet
 	sendTime int64
+	noRTT    bool
 }
 
 type sendBuffer struct {
@@ -39,13 +40,14 @@ func (buffer *sendBuffer) Reset() {
 	buffer.tail = nil
 }
 
-func (buffer *sendBuffer) Add(packet *Packet) {
+func (buffer *sendBuffer) Add(packet *Packet, noRTT bool) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 
 	e := &sendBufferElement{data: sendPacket{
 		packet:   packet,
 		sendTime: currentTime(),
+		noRTT:    noRTT,
 	}}
 
 	if buffer.head == nil {

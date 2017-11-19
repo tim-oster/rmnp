@@ -101,6 +101,15 @@ func (c *Connection) reset() {
 	c.lastResendTime = 0
 	c.lastReceivedTime = 0
 	c.pingPacketInterval = 0
+
+	for {
+		select {
+		case <-c.sendQueue:
+		case <-c.receiveQueue:
+		default:
+			break
+		}
+	}
 }
 
 func (c *Connection) startRoutines() {
@@ -192,7 +201,7 @@ func (c *Connection) keepAlive(ctx context.Context) {
 		currentTime := currentTime()
 
 		if currentTime-c.lastReceivedTime > TimeoutThreshold || c.GetPing() > MaxPing {
-			// NOTE: needs to be executed in goroutine; otherwise this method could not exit and therefore deadlock
+			// needs to be executed in goroutine; otherwise this method could not exit and therefore deadlock
 			// the connection's waitGroup
 			go c.protocol.timeoutClient(c)
 		}
@@ -282,7 +291,10 @@ func (c *Connection) handleAckPacket(packet *Packet) bool {
 			s := packet.ack - i
 
 			if packet, found := c.sendBuffer.Retrieve(s); found {
-				c.congestionHandler.check(packet.sendTime)
+				if !packet.noRTT {
+					c.congestionHandler.check(packet.sendTime)
+				}
+
 				fmt.Println("#", s, "acked")
 			}
 		}
@@ -312,7 +324,7 @@ func (c *Connection) processSend(packet *Packet, resend bool) {
 				c.orderedSequence++
 			}
 
-			c.sendBuffer.Add(packet)
+			c.sendBuffer.Add(packet, c.state != Connected)
 		} else if packet.Flag(Ordered) {
 			packet.sequence = c.localUnreliableSequence
 			c.localUnreliableSequence++
