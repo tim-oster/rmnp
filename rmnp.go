@@ -222,8 +222,7 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 
 	// send more than necessary so that the packet hopefully arrives
 	for i := 0; i < 10; i++ {
-		// TODO reliable?
-		connection.sendLowLevelPacket(Reliable | Disconnect)
+		connection.sendLowLevelPacket(Disconnect)
 	}
 
 	// give the channel some time to process the packets
