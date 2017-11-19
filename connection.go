@@ -206,7 +206,7 @@ func (c *Connection) keepAlive() {
 
 		currentTime := currentTime()
 
-		if currentTime-c.lastReceivedTime > TimeoutThreshold || c.GetPing() > MaxPing {
+		if currentTime-c.lastReceivedTime > int64(TimeoutThreshold) || c.GetPing() > MaxPing {
 			// needs to be executed in goroutine; otherwise this method could not exit and therefore deadlock
 			// the connection's waitGroup
 			go func() {
@@ -373,6 +373,6 @@ func (c *Connection) sendAckPacket() {
 	c.sendLowLevelPacket(Ack)
 }
 
-func (c *Connection) GetPing() int32 {
+func (c *Connection) GetPing() int {
 	return int32(c.congestionHandler.rtt / 2)
 }
