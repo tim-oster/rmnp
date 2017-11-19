@@ -122,6 +122,8 @@ func (impl *protocolImpl) listen() {
 }
 
 func (impl *protocolImpl) listeningWorker() {
+	defer antiPanic(impl.listeningWorker)
+
 	impl.waitGroup.Add(1)
 	defer impl.waitGroup.Done()
 
@@ -133,6 +135,8 @@ func (impl *protocolImpl) listeningWorker() {
 		}
 
 		func() {
+			defer antiPanic(nil)
+
 			buffer := impl.bufferPool.Get().([]byte)
 			defer impl.bufferPool.Put(buffer)
 
@@ -159,6 +163,8 @@ func (impl *protocolImpl) listeningWorker() {
 }
 
 func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
+	defer antiPanic(nil)
+
 	impl.waitGroup.Add(1)
 	defer impl.waitGroup.Done()
 

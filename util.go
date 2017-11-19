@@ -19,6 +19,19 @@ func checkError(msg string, err error) {
 	}
 }
 
+func antiPanic(callback func()) {
+	if err := recover(); err != nil {
+		fmt.Println("panic:", err)
+
+		if callback != nil {
+			go func() {
+				defer antiPanic(nil)
+				callback()
+			}()
+		}
+	}
+}
+
 func addrHash(addr *net.UDPAddr) uint16 {
 	port := cnvUint32(uint32(addr.Port))
 	return crc16.Crc16(append(addr.IP, port...))

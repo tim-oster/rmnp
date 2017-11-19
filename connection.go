@@ -114,19 +114,21 @@ func (c *Connection) reset() {
 
 func (c *Connection) startRoutines() {
 	c.ctx, c.stopRoutines = context.WithCancel(context.Background())
-	go c.sendUpdate(c.ctx)
-	go c.receiveUpdate(c.ctx)
-	go c.keepAlive(c.ctx)
+	go c.sendUpdate()
+	go c.receiveUpdate()
+	go c.keepAlive()
 }
 
-func (c *Connection) sendUpdate(ctx context.Context) {
+func (c *Connection) sendUpdate() {
+	defer antiPanic(c.sendUpdate)
+
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
 
 	for {
 		select {
 		case <-time.After(UpdateLoopInterval * time.Millisecond):
-		case <-ctx.Done():
+		case <-c.ctx.Done():
 			return
 		case packet := <-c.sendQueue:
 			c.processSend(packet, false)
@@ -169,13 +171,15 @@ func (c *Connection) sendUpdate(ctx context.Context) {
 	}
 }
 
-func (c *Connection) receiveUpdate(ctx context.Context) {
+func (c *Connection) receiveUpdate() {
+	defer antiPanic(c.receiveUpdate)
+
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.ctx.Done():
 			return
 		case packet := <-c.receiveQueue:
 			c.processReceive(packet)
@@ -183,13 +187,15 @@ func (c *Connection) receiveUpdate(ctx context.Context) {
 	}
 }
 
-func (c *Connection) keepAlive(ctx context.Context) {
+func (c *Connection) keepAlive() {
+	defer antiPanic(c.keepAlive)
+
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.ctx.Done():
 			return
 		case <-time.After(TimeoutThreshold * time.Millisecond / 2):
 		}
@@ -203,7 +209,10 @@ func (c *Connection) keepAlive(ctx context.Context) {
 		if currentTime-c.lastReceivedTime > TimeoutThreshold || c.GetPing() > MaxPing {
 			// needs to be executed in goroutine; otherwise this method could not exit and therefore deadlock
 			// the connection's waitGroup
-			go c.protocol.timeoutClient(c)
+			go func() {
+				defer antiPanic(nil)
+				c.protocol.timeoutClient(c)
+			}()
 		}
 	}
 }
