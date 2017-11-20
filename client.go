@@ -24,11 +24,11 @@ func NewClient(server string) *Client {
 			return 0, nil, false
 		}
 
-		return length, c.server.addr, true
+		return length, c.server.Addr, true
 	}
 
 	c.writeFunc = func(c *Connection, buffer []byte) {
-		c.conn.Write(buffer)
+		c.Conn.Write(buffer)
 	}
 
 	c.onConnect = func(connection *Connection) {
@@ -48,7 +48,7 @@ func NewClient(server string) *Client {
 		return false
 	}
 
-	c.onPacket = func(connection *Connection, packet *Packet) {
+	c.onPacket = func(connection *Connection, packet *packet) {
 		fmt.Println(string(packet.data))
 	}
 

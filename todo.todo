@@ -19,17 +19,8 @@ Problems:
         ☐ packet chain could get large with only a few elements missing (should consider max timeout and than execute order as it is present)
 
 Library:
-    ☐ Format / check public/private names
-    ☐ subfolders
-    ☐ Make actual library
-        """A good design is to make your type unexported, but provide an exported constructor function like NewMyType()
-        in which you can properly initialize your struct / type. Also return an interface type and not a concrete type,
-        and the interface should contain everything others want to do with your value. And your concrete type must
-        implement that interface of course."""
-        https://stackoverflow.com/questions/37135193/how-to-set-default-values-in-golang-structs
     ☐ Remove/replace logs with useful once
     ☐ Documentation & Comments
-    
     ☐ tests?
 
 Code Review:

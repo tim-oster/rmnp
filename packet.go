@@ -15,16 +15,16 @@ type descriptor byte
 
 const (
 	// Send Flags
-	Reliable descriptor = 1 << iota
-	Ack
-	Ordered
+	descReliable descriptor = 1 << iota
+	descAck
+	descOrdered
 
 	// Basic Packet Types (only single use possible)
-	Connect
-	Disconnect
+	descConnect
+	descDisconnect
 )
 
-type Packet struct {
+type packet struct {
 	protocolId byte
 	crc32      uint32
 	descriptor descriptor
@@ -43,22 +43,22 @@ type Packet struct {
 	data []byte
 }
 
-func (p *Packet) Serialize() []byte {
+func (p *packet) serialize() []byte {
 	s := NewSerializer()
 
 	s.Write(p.protocolId)
 	s.Write(p.crc32)
 	s.Write(p.descriptor)
 
-	if p.Flag(Reliable) || p.Flag(Ordered) {
+	if p.flag(descReliable) || p.flag(descOrdered) {
 		s.Write(p.sequence)
 	}
 
-	if p.Flag(Reliable) && p.Flag(Ordered) {
+	if p.flag(descReliable) && p.flag(descOrdered) {
 		s.Write(p.order)
 	}
 
-	if p.Flag(Ack) {
+	if p.flag(descAck) {
 		s.Write(p.ack)
 		s.Write(p.ackBits)
 	}
@@ -70,7 +70,7 @@ func (p *Packet) Serialize() []byte {
 	return s.Bytes()
 }
 
-func (p *Packet) Deserialize(packet []byte) bool {
+func (p *packet) deserialize(packet []byte) bool {
 	s := NewSerializerFor(packet)
 
 	// head is valid (validated before data processing)
@@ -78,19 +78,19 @@ func (p *Packet) Deserialize(packet []byte) bool {
 	s.Read(&p.crc32)
 	s.Read(&p.descriptor)
 
-	if p.Flag(Reliable) || p.Flag(Ordered) {
+	if p.flag(descReliable) || p.flag(descOrdered) {
 		if s.Read(&p.sequence) != nil {
 			return false
 		}
 	}
 
-	if p.Flag(Reliable) && p.Flag(Ordered) {
+	if p.flag(descReliable) && p.flag(descOrdered) {
 		if s.Read(&p.order) != nil {
 			return false
 		}
 	}
 
-	if p.Flag(Ack) {
+	if p.flag(descAck) {
 		if s.Read(&p.ack) != nil {
 			return false
 		}
@@ -108,13 +108,13 @@ func (p *Packet) Deserialize(packet []byte) bool {
 	return true
 }
 
-func (p *Packet) CalculateHash() {
+func (p *packet) calculateHash() {
 	p.crc32 = 0
-	buffer := p.Serialize()
+	buffer := p.serialize()
 	p.crc32 = crc32.ChecksumIEEE(buffer)
 }
 
-func (p *Packet) Flag(flag descriptor) bool {
+func (p *packet) flag(flag descriptor) bool {
 	return p.descriptor&flag != 0
 }
 
@@ -124,7 +124,7 @@ func validateHeader(packet []byte) bool {
 		return false
 	}
 
-	if packet[0] != ProtocolId {
+	if packet[0] != CfgProtocolId {
 		return false
 	}
 
@@ -144,17 +144,17 @@ func headerSize(packet []byte) int {
 	// protocolId (1) + crc (4) + descriptor (1)
 	size += 6
 
-	if desc&Reliable != 0 || desc&Ordered != 0 {
+	if desc&descReliable != 0 || desc&descOrdered != 0 {
 		// sequence (2)
 		size += 2
 	}
 
-	if desc&Reliable != 0 && desc&Ordered != 0 {
+	if desc&descReliable != 0 && desc&descOrdered != 0 {
 		// order (1)
 		size += 2
 	}
 
-	if desc&Ack != 0 {
+	if desc&descAck != 0 {
 		// ack (2) + ackBits (4)
 		size += 6
 	}

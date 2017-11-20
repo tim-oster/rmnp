@@ -6,22 +6,22 @@ package rmnp
 
 import "sync"
 
-type SequenceBuffer struct {
+type sequenceBuffer struct {
 	size      sequenceNumber
 	sequences []sequenceNumber
 	states    []bool
 	mutex     sync.Mutex
 }
 
-func NewSequenceBuffer(size sequenceNumber) *SequenceBuffer {
-	buffer := new(SequenceBuffer)
+func newSequenceBuffer(size sequenceNumber) *sequenceBuffer {
+	buffer := new(sequenceBuffer)
 	buffer.size = size
 	buffer.sequences = make([]sequenceNumber, size)
 	buffer.states = make([]bool, size)
 	return buffer
 }
 
-func (buffer *SequenceBuffer) reset() {
+func (buffer *sequenceBuffer) reset() {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 
@@ -31,7 +31,7 @@ func (buffer *SequenceBuffer) reset() {
 	}
 }
 
-func (buffer *SequenceBuffer) Get(sequence sequenceNumber) bool {
+func (buffer *sequenceBuffer) get(sequence sequenceNumber) bool {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 
@@ -46,7 +46,7 @@ func (buffer *SequenceBuffer) Get(sequence sequenceNumber) bool {
 	return buffer.states[sequence%buffer.size]
 }
 
-func (buffer *SequenceBuffer) Set(sequence sequenceNumber, value bool) {
+func (buffer *sequenceBuffer) set(sequence sequenceNumber, value bool) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 

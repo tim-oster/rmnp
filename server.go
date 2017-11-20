@@ -27,26 +27,26 @@ func NewServer(address string) *Server {
 	}
 
 	s.writeFunc = func(c *Connection, buffer []byte) {
-		c.conn.WriteToUDP(buffer, c.addr)
+		c.Conn.WriteToUDP(buffer, c.Addr)
 	}
 
 	s.onConnect = func(connection *Connection) {
-		fmt.Println("client connected:", connection.addr)
+		fmt.Println("client connected:", connection.Addr)
 	}
 
 	s.onDisconnect = func(connection *Connection) {
-		fmt.Println("client disconnect:", connection.addr)
+		fmt.Println("client disconnect:", connection.Addr)
 	}
 
 	s.onTimeout = func(connection *Connection) {
-		fmt.Println("timeout:", connection.addr)
+		fmt.Println("timeout:", connection.Addr)
 	}
 
 	s.onValidation = func(connection *Connection, addr *net.UDPAddr, packet []byte) bool {
 		return true
 	}
 
-	s.onPacket = func(connection *Connection, packet *Packet) {
+	s.onPacket = func(connection *Connection, packet *packet) {
 		fmt.Println(packet.data)
 	}
 

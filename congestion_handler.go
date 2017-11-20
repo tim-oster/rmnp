@@ -9,9 +9,9 @@ import "fmt"
 type congestionMode uint8
 
 const (
-	None congestionMode = iota
-	Good
-	Bad
+	congestionModeNone congestionMode = iota
+	congestionModeGood
+	congestionModeBad
 )
 
 type congestionHandler struct {
@@ -28,16 +28,16 @@ type congestionHandler struct {
 	ReackTimeout     int64
 }
 
-func NewCongestionHandler() *congestionHandler {
+func newCongestionHandler() *congestionHandler {
 	handler := new(congestionHandler)
 	handler.reset()
 	return handler
 }
 
 func (handler *congestionHandler) reset() {
-	handler.changeMode(None)
+	handler.changeMode(congestionModeNone)
 	handler.rtt = 0
-	handler.requiredTime = DefaultCongestionRequiredTime
+	handler.requiredTime = CfgDefaultCongestionRequiredTime
 	handler.unreliableCount = 0
 }
 
@@ -48,47 +48,47 @@ func (handler *congestionHandler) check(sendTime int64) {
 	if handler.rtt == 0 {
 		handler.rtt = rtt
 	} else {
-		handler.rtt += int64(float32(rtt-handler.rtt) * RTTSmoothFactor)
+		handler.rtt += int64(float32(rtt-handler.rtt) * CfgRTTSmoothFactor)
 	}
 
 	switch handler.mode {
-	case None:
-		handler.changeMode(Good)
-	case Good:
-		if rtt > CongestionThreshold {
-			if time-handler.lastChangeTime <= BadRTTPunishTimeout {
-				handler.requiredTime = min(MaxCongestionRequiredTime, handler.requiredTime*2)
+	case congestionModeNone:
+		handler.changeMode(congestionModeGood)
+	case congestionModeGood:
+		if rtt > CfgCongestionThreshold {
+			if time-handler.lastChangeTime <= CfgBadRTTPunishTimeout {
+				handler.requiredTime = min(CfgMaxCongestionRequiredTime, handler.requiredTime*2)
 			}
 
-			handler.changeMode(Bad)
-		} else if time-handler.lastChangeTime >= GoodRTTRewardInterval {
+			handler.changeMode(congestionModeBad)
+		} else if time-handler.lastChangeTime >= CfgGoodRTTRewardInterval {
 			handler.requiredTime = max(1, handler.requiredTime/2)
 			handler.lastChangeTime = time
 		}
-	case Bad:
-		if rtt > CongestionThreshold {
+	case congestionModeBad:
+		if rtt > CfgCongestionThreshold {
 			handler.lastChangeTime = time
 		}
 
 		if time-handler.lastChangeTime >= handler.requiredTime {
-			handler.changeMode(Good)
+			handler.changeMode(congestionModeGood)
 		}
 	}
 }
 
 func (handler *congestionHandler) changeMode(mode congestionMode) {
 	switch mode {
-	case None:
+	case congestionModeNone:
 		fallthrough
-	case Good:
-		handler.ResendTimeout = ResendTimeout
-		handler.MaxPacketResends = MaxPacketResends
-		handler.ReackTimeout = ReackTimeout
+	case congestionModeGood:
+		handler.ResendTimeout = CfgResendTimeout
+		handler.MaxPacketResends = CfgMaxPacketResends
+		handler.ReackTimeout = CfgReackTimeout
 		fmt.Println("============================> congestion mode: good")
-	case Bad:
-		handler.ResendTimeout = int64(float32(ResendTimeout) * BadModeMultiplier)
-		handler.MaxPacketResends = int64(float32(MaxPacketResends) / BadModeMultiplier)
-		handler.ReackTimeout = int64(float32(ReackTimeout) * BadModeMultiplier)
+	case congestionModeBad:
+		handler.ResendTimeout = int64(float32(CfgResendTimeout) * CfgBadModeMultiplier)
+		handler.MaxPacketResends = int64(float32(CfgMaxPacketResends) / CfgBadModeMultiplier)
+		handler.ReackTimeout = int64(float32(CfgReackTimeout) * CfgBadModeMultiplier)
 		fmt.Println("============================> congestion mode: bad")
 	}
 
@@ -99,11 +99,11 @@ func (handler *congestionHandler) changeMode(mode congestionMode) {
 // for unreliable packets only
 func (handler *congestionHandler) shouldDropUnreliable() bool {
 	switch handler.mode {
-	case Good:
+	case congestionModeGood:
 		return false
-	case Bad:
+	case congestionModeBad:
 		handler.unreliableCount++
-		return handler.unreliableCount%CongestionPacketReduction == 0
+		return handler.unreliableCount%CfgCongestionPacketReduction == 0
 	}
 
 	return false

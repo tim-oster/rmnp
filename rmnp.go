@@ -15,7 +15,7 @@ import (
 
 type ConnectionCallback func(*Connection)
 type ValidationCallback func(*Connection, *net.UDPAddr, []byte) bool
-type PacketCallback func(*Connection, *Packet)
+type PacketCallback func(*Connection, *packet)
 
 func invokeConnectionCallback(callback ConnectionCallback, connection *Connection) {
 	if callback != nil {
@@ -31,7 +31,7 @@ func invokeValidationCallback(callback ValidationCallback, connection *Connectio
 	return true
 }
 
-func invokePacketCallback(callback PacketCallback, connection *Connection, packet *Packet) {
+func invokePacketCallback(callback PacketCallback, connection *Connection, packet *packet) {
 	if callback != nil {
 		callback(connection, packet)
 	}
@@ -73,7 +73,7 @@ func (impl *protocolImpl) init(address string) {
 	impl.connections = make(map[uint32]*Connection)
 
 	impl.bufferPool = sync.Pool{
-		New: func() interface{} { return make([]byte, MTU) },
+		New: func() interface{} { return make([]byte, CfgMTU) },
 	}
 
 	impl.connectionPool = sync.Pool{
@@ -110,14 +110,14 @@ func (impl *protocolImpl) destroy() {
 func (impl *protocolImpl) setSocket(socket *net.UDPConn, err error) {
 	checkError("Error creating socket", err)
 	impl.socket = socket
-	impl.socket.SetReadBuffer(MTU)
-	impl.socket.SetWriteBuffer(MTU)
+	impl.socket.SetReadBuffer(CfgMTU)
+	impl.socket.SetWriteBuffer(CfgMTU)
 }
 
 func (impl *protocolImpl) listen() {
 	impl.ctx, impl.cancel = context.WithCancel(context.Background())
 
-	for i := 0; i < ParallelListenerCount; i++ {
+	for i := 0; i < CfgParallelListenerCount; i++ {
 		go impl.listeningWorker()
 	}
 }
@@ -172,7 +172,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	impl.connectionsMutex.RUnlock()
 
 	if !exists {
-		if descriptor(packet[5])&Connect == 0 {
+		if descriptor(packet[5])&descConnect == 0 {
 			fmt.Println("no connect data data")
 			return
 		}
@@ -187,12 +187,12 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	}
 
 	// done this way to ensure that connect callback is executed on client-side
-	if connection.state != Connected && descriptor(packet[5])&Connect != 0 {
+	if connection.state != stateConnected && descriptor(packet[5])&descConnect != 0 {
 		invokeConnectionCallback(impl.onConnect, connection)
-		connection.state = Connected
+		connection.state = stateConnected
 	}
 
-	if descriptor(packet[5])&Disconnect != 0 {
+	if descriptor(packet[5])&descDisconnect != 0 {
 		impl.disconnectClient(connection, false)
 		return
 	}
@@ -213,24 +213,24 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	impl.connections[hash] = connection
 	impl.connectionsMutex.Unlock()
 
-	connection.sendLowLevelPacket(Reliable | Connect)
+	connection.sendLowLevelPacket(descReliable | descConnect)
 	connection.startRoutines()
 
 	return connection
 }
 
 func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool) {
-	if connection.state == Disconnected {
+	if connection.state == stateDisconnected {
 		return
 	}
 
 	atomic.AddUint64(&StatDisconnects, 1)
 
-	connection.state = Disconnected
+	connection.state = stateDisconnected
 
 	// send more than necessary so that the packet hopefully arrives
 	for i := 0; i < 10; i++ {
-		connection.sendLowLevelPacket(Disconnect)
+		connection.sendLowLevelPacket(descDisconnect)
 	}
 
 	// give the channel some time to process the packets
@@ -239,7 +239,7 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	connection.stopRoutines()
 	connection.waitGroup.Wait()
 
-	hash := addrHash(connection.addr)
+	hash := addrHash(connection.Addr)
 
 	impl.connectionsMutex.Lock()
 	delete(impl.connections, hash)

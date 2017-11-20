@@ -16,15 +16,15 @@ import (
 type connectionState uint8
 
 const (
-	Disconnected connectionState = iota
-	Connecting
-	Connected
+	stateDisconnected connectionState = iota
+	stateConnecting
+	stateConnected
 )
 
 type Connection struct {
 	protocol *protocolImpl
-	conn     *net.UDPConn
-	addr     *net.UDPAddr
+	Conn     *net.UDPConn
+	Addr     *net.UDPAddr
 	state    connectionState
 
 	// for go routines
@@ -47,31 +47,31 @@ type Connection struct {
 	lastReceivedTime   int64
 	pingPacketInterval uint8
 	sendBuffer         *sendBuffer
-	receiveBuffer      *SequenceBuffer
+	receiveBuffer      *sequenceBuffer
 	congestionHandler  *congestionHandler
 
-	sendQueue    chan *Packet
+	sendQueue    chan *packet
 	receiveQueue chan []byte
 	waitGroup    sync.WaitGroup
 }
 
 func newConnection() *Connection {
 	return &Connection{
-		state:             Disconnected,
-		orderedChain:      NewPacketChain(),
-		sendBuffer:        NewSendBuffer(),
-		receiveBuffer:     NewSequenceBuffer(SequenceBufferSize),
-		congestionHandler: NewCongestionHandler(),
-		sendQueue:         make(chan *Packet, MaxSendReceiveQueueSize),
-		receiveQueue:      make(chan []byte, MaxSendReceiveQueueSize),
+		state:             stateDisconnected,
+		orderedChain:      newPacketChain(),
+		sendBuffer:        newSendBuffer(),
+		receiveBuffer:     newSequenceBuffer(CfgSequenceBufferSize),
+		congestionHandler: newCongestionHandler(),
+		sendQueue:         make(chan *packet, CfgMaxSendReceiveQueueSize),
+		receiveQueue:      make(chan []byte, CfgMaxSendReceiveQueueSize),
 	}
 }
 
 func (c *Connection) init(impl *protocolImpl, addr *net.UDPAddr) {
 	c.protocol = impl
-	c.conn = impl.socket
-	c.addr = addr
-	c.state = Connecting
+	c.Conn = impl.socket
+	c.Addr = addr
+	c.state = stateConnecting
 
 	t := currentTime()
 	c.lastSendTime = t
@@ -81,12 +81,12 @@ func (c *Connection) init(impl *protocolImpl, addr *net.UDPAddr) {
 
 func (c *Connection) reset() {
 	c.protocol = nil
-	c.conn = nil
-	c.addr = nil
-	c.state = Disconnected
+	c.Conn = nil
+	c.Addr = nil
+	c.state = stateDisconnected
 
 	c.orderedChain.reset()
-	c.sendBuffer.Reset()
+	c.sendBuffer.reset()
 	c.receiveBuffer.reset()
 	c.congestionHandler.reset()
 
@@ -128,7 +128,7 @@ func (c *Connection) sendUpdate() {
 
 	for {
 		select {
-		case <-time.After(UpdateLoopInterval * time.Millisecond):
+		case <-time.After(CfgUpdateLoopInterval * time.Millisecond):
 		case <-c.ctx.Done():
 			return
 		case packet := <-c.sendQueue:
@@ -140,30 +140,30 @@ func (c *Connection) sendUpdate() {
 		if currentTime-c.lastResendTime > c.congestionHandler.ResendTimeout {
 			c.lastResendTime = currentTime
 
-			c.sendBuffer.Iterate(func(i int, data *sendPacket) SendBufferOP {
+			c.sendBuffer.iterate(func(i int, data *sendPacket) sendBufferOP {
 				if int64(i) >= c.congestionHandler.MaxPacketResends {
-					return SendBufferCancel
+					return sendBufferCancel
 				}
 
-				if currentTime-data.sendTime > SendRemoveTimeout {
-					return SendBufferDelete
+				if currentTime-data.sendTime > CfgSendRemoveTimeout {
+					return sendBufferDelete
 				} else {
 					c.processSend(data.packet, true)
 				}
 
-				return SendBufferContinue
+				return sendBufferContinue
 			})
 		}
 
-		if c.state != Connected {
+		if c.state != stateConnected {
 			continue
 		}
 
 		if currentTime-c.lastSendTime > c.congestionHandler.ReackTimeout {
 			c.sendAckPacket()
 
-			if c.pingPacketInterval%AutoPingInterval == 0 {
-				c.sendLowLevelPacket(Reliable)
+			if c.pingPacketInterval%CfgAutoPingInterval == 0 {
+				c.sendLowLevelPacket(descReliable)
 				c.pingPacketInterval = 0
 			}
 
@@ -198,16 +198,16 @@ func (c *Connection) keepAlive() {
 		select {
 		case <-c.ctx.Done():
 			return
-		case <-time.After(TimeoutThreshold * time.Millisecond / 2):
+		case <-time.After(CfgTimeoutThreshold * time.Millisecond / 2):
 		}
 
-		if c.state == Disconnected {
+		if c.state == stateDisconnected {
 			continue
 		}
 
 		currentTime := currentTime()
 
-		if currentTime-c.lastReceivedTime > int64(TimeoutThreshold) || c.GetPing() > MaxPing {
+		if currentTime-c.lastReceivedTime > int64(CfgTimeoutThreshold) || c.GetPing() > CfgMaxPing {
 			// needs to be executed in goroutine; otherwise this method could not exit and therefore deadlock
 			// the connection's waitGroup
 			go func() {
@@ -218,29 +218,29 @@ func (c *Connection) keepAlive() {
 	}
 }
 
-func (c *Connection) processReceive(packet []byte) {
+func (c *Connection) processReceive(buffer []byte) {
 	c.lastReceivedTime = currentTime()
 
-	p := new(Packet)
+	p := new(packet)
 
-	if size := headerSize(packet); len(packet)-size > 0 {
-		p.data = packet[size:]
+	if size := headerSize(buffer); len(buffer)-size > 0 {
+		p.data = buffer[size:]
 	}
 
-	if !p.Deserialize(packet) {
+	if !p.deserialize(buffer) {
 		fmt.Println("error during data deserialization")
 		return
 	}
 
-	if p.Flag(Reliable) && !c.handleReliablePacket(p) {
+	if p.flag(descReliable) && !c.handleReliablePacket(p) {
 		return
 	}
 
-	if p.Flag(Ack) && !c.handleAckPacket(p) {
+	if p.flag(descAck) && !c.handleAckPacket(p) {
 		return
 	}
 
-	if p.Flag(Ordered) && !c.handleOrderedPacket(p) {
+	if p.flag(descOrdered) && !c.handleOrderedPacket(p) {
 		return
 	}
 
@@ -249,26 +249,26 @@ func (c *Connection) processReceive(packet []byte) {
 	}
 }
 
-func (c *Connection) handleReliablePacket(packet *Packet) bool {
+func (c *Connection) handleReliablePacket(packet *packet) bool {
 	fmt.Println("recveived sequences #", packet.sequence)
 
-	if c.receiveBuffer.Get(packet.sequence) {
+	if c.receiveBuffer.get(packet.sequence) {
 		fmt.Println(":: was duplicate")
 		return false
 	}
 
 	// sendUpdate receive states
-	c.receiveBuffer.Set(packet.sequence, true)
+	c.receiveBuffer.set(packet.sequence, true)
 
 	// sendUpdate remote sequences number
-	if greaterThanSequence(packet.sequence, c.remoteSequence) && differenceSequence(packet.sequence, c.remoteSequence) <= MaxSkippedPackets {
+	if greaterThanSequence(packet.sequence, c.remoteSequence) && differenceSequence(packet.sequence, c.remoteSequence) <= CfgMaxSkippedPackets {
 		c.remoteSequence = packet.sequence
 	}
 
 	// sendUpdate ack bit mask for last 32 packets
 	c.ackBits = 0
 	for i := sequenceNumber(1); i <= 32; i++ {
-		if c.receiveBuffer.Get(c.remoteSequence - i) {
+		if c.receiveBuffer.get(c.remoteSequence - i) {
 			c.ackBits |= 1 << (i - 1)
 		}
 	}
@@ -278,11 +278,11 @@ func (c *Connection) handleReliablePacket(packet *Packet) bool {
 	return true
 }
 
-func (c *Connection) handleOrderedPacket(packet *Packet) bool {
-	if packet.Flag(Reliable) {
-		c.orderedChain.Chain(packet)
+func (c *Connection) handleOrderedPacket(packet *packet) bool {
+	if packet.flag(descReliable) {
+		c.orderedChain.chain(packet)
 
-		for l := c.orderedChain.PopConsecutive(); l != nil; l = l.next {
+		for l := c.orderedChain.popConsecutive(); l != nil; l = l.next {
 			c.process(l.packet)
 		}
 	} else {
@@ -295,12 +295,12 @@ func (c *Connection) handleOrderedPacket(packet *Packet) bool {
 	return false
 }
 
-func (c *Connection) handleAckPacket(packet *Packet) bool {
+func (c *Connection) handleAckPacket(packet *packet) bool {
 	for i := sequenceNumber(0); i <= 32; i++ {
 		if i == 0 || packet.ackBits&(1<<(i-1)) != 0 {
 			s := packet.ack - i
 
-			if packet, found := c.sendBuffer.Retrieve(s); found {
+			if packet, found := c.sendBuffer.retrieve(s); found {
 				if !packet.noRTT {
 					c.congestionHandler.check(packet.sendTime)
 				}
@@ -313,40 +313,40 @@ func (c *Connection) handleAckPacket(packet *Packet) bool {
 	return true
 }
 
-func (c *Connection) process(packet *Packet) {
+func (c *Connection) process(packet *packet) {
 	invokePacketCallback(c.protocol.onPacket, c, packet)
 }
 
-func (c *Connection) processSend(packet *Packet, resend bool) {
-	if !packet.Flag(Reliable) && c.congestionHandler.shouldDropUnreliable() {
+func (c *Connection) processSend(packet *packet, resend bool) {
+	if !packet.flag(descReliable) && c.congestionHandler.shouldDropUnreliable() {
 		return
 	}
 
-	packet.protocolId = ProtocolId
+	packet.protocolId = CfgProtocolId
 
 	if !resend {
-		if packet.Flag(Reliable) {
+		if packet.flag(descReliable) {
 			packet.sequence = c.localSequence
 			c.localSequence++
 
-			if packet.Flag(Ordered) {
+			if packet.flag(descOrdered) {
 				packet.order = c.orderedSequence
 				c.orderedSequence++
 			}
 
-			c.sendBuffer.Add(packet, c.state != Connected)
-		} else if packet.Flag(Ordered) {
+			c.sendBuffer.add(packet, c.state != stateConnected)
+		} else if packet.flag(descOrdered) {
 			packet.sequence = c.localUnreliableSequence
 			c.localUnreliableSequence++
 		}
 	}
 
-	if packet.Flag(Ack) {
+	if packet.flag(descAck) {
 		packet.ack = c.remoteSequence
 		packet.ackBits = c.ackBits
 	}
 
-	if packet.Flag(Reliable) {
+	if packet.flag(descReliable) {
 		fmt.Print("data sequences #", packet.sequence)
 		if resend {
 			fmt.Println(" resend")
@@ -355,24 +355,24 @@ func (c *Connection) processSend(packet *Packet, resend bool) {
 		}
 	}
 
-	packet.CalculateHash()
-	buffer := packet.Serialize()
+	packet.calculateHash()
+	buffer := packet.serialize()
 	c.protocol.writeFunc(c, buffer)
 	atomic.AddUint64(&StatSendBytes, uint64(len(buffer)))
 
 	c.lastSendTime = currentTime()
 }
 
-func (c *Connection) SendPacket(packet *Packet) {
+func (c *Connection) SendPacket(packet *packet) {
 	c.sendQueue <- packet
 }
 
 func (c *Connection) sendLowLevelPacket(descriptor descriptor) {
-	c.SendPacket(&Packet{descriptor: descriptor})
+	c.SendPacket(&packet{descriptor: descriptor})
 }
 
 func (c *Connection) sendAckPacket() {
-	c.sendLowLevelPacket(Ack)
+	c.sendLowLevelPacket(descAck)
 }
 
 func (c *Connection) GetPing() int16 {

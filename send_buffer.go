@@ -6,16 +6,16 @@ package rmnp
 
 import "sync"
 
-type SendBufferOP byte
+type sendBufferOP byte
 
 const (
-	SendBufferDelete   SendBufferOP = iota
-	SendBufferCancel
-	SendBufferContinue
+	sendBufferDelete   sendBufferOP = iota
+	sendBufferCancel
+	sendBufferContinue
 )
 
 type sendPacket struct {
-	packet   *Packet
+	packet   *packet
 	sendTime int64
 	noRTT    bool
 }
@@ -32,11 +32,11 @@ type sendBufferElement struct {
 	data sendPacket
 }
 
-func NewSendBuffer() *sendBuffer {
+func newSendBuffer() *sendBuffer {
 	return new(sendBuffer)
 }
 
-func (buffer *sendBuffer) Reset() {
+func (buffer *sendBuffer) reset() {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 
@@ -44,7 +44,7 @@ func (buffer *sendBuffer) Reset() {
 	buffer.tail = nil
 }
 
-func (buffer *sendBuffer) Add(packet *Packet, noRTT bool) {
+func (buffer *sendBuffer) add(packet *packet, noRTT bool) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 
@@ -78,7 +78,7 @@ func (buffer *sendBuffer) remove(e *sendBufferElement) {
 	}
 }
 
-func (buffer *sendBuffer) Retrieve(sequence sequenceNumber) (sendPacket, bool) {
+func (buffer *sendBuffer) retrieve(sequence sequenceNumber) (sendPacket, bool) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 
@@ -93,17 +93,17 @@ func (buffer *sendBuffer) Retrieve(sequence sequenceNumber) (sendPacket, bool) {
 	return packet, false
 }
 
-func (buffer *sendBuffer) Iterate(iterator func(int, *sendPacket) SendBufferOP) {
+func (buffer *sendBuffer) iterate(iterator func(int, *sendPacket) sendBufferOP) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 
 	for i, e := 0, buffer.head; e != nil; i, e = i+1, e.next {
 		switch iterator(i, &e.data) {
-		case SendBufferDelete:
+		case sendBufferDelete:
 			buffer.remove(e)
-		case SendBufferCancel:
+		case sendBufferCancel:
 			return
-		case SendBufferContinue:
+		case sendBufferContinue:
 		}
 	}
 }

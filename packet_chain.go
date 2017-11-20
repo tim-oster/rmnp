@@ -15,10 +15,10 @@ type packetChain struct {
 
 type chainLink struct {
 	next   *chainLink
-	packet *Packet
+	packet *packet
 }
 
-func NewPacketChain() *packetChain {
+func newPacketChain() *packetChain {
 	return new(packetChain)
 }
 
@@ -31,7 +31,7 @@ func (chain *packetChain) reset() {
 	chain.length = 0
 }
 
-func (chain *packetChain) Chain(packet *Packet) {
+func (chain *packetChain) chain(packet *packet) {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
@@ -55,7 +55,7 @@ func (chain *packetChain) Chain(packet *Packet) {
 		}
 	}
 
-	if chain.length >= MaxPacketChainLength {
+	if chain.length >= CfgMaxPacketChainLength {
 		chain.start = chain.start.next
 		chain.length--
 	}
@@ -63,7 +63,7 @@ func (chain *packetChain) Chain(packet *Packet) {
 	chain.length++
 }
 
-func (chain *packetChain) PopConsecutive() *chainLink {
+func (chain *packetChain) popConsecutive() *chainLink {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
