@@ -159,8 +159,6 @@ func (c *Connection) sendUpdate() {
 			continue
 		}
 
-		fmt.Println(StatSendBytes)
-
 		if currentTime-c.lastSendTime > c.congestionHandler.ReackTimeout {
 			c.sendAckPacket()
 
