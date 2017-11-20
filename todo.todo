@@ -1,0 +1,86 @@
+Realtime Multiplayer Networking Protocol:
+    ✔ Protocol ID @done (2017-11-4 20:13:21)
+    ✔ Error checks (CRC32) @done (2017-11-4 20:13:22)
+    ✔ Channels (https://docs.unity3d.com/ScriptReference/Networking.QosType.html) @done (2017-11-9 19:11:53)
+        ✔ Unreliable @done (2017-11-5 13:55:06)
+        ✔ Reliable @done (2017-11-8 21:19:09)
+        ✔ Unreliable ordered @done (2017-11-9 14:26:20)
+        ✔ Reliable ordered @done (2017-11-9 19:11:52)
+    ✘ Messages (https://gafferongames.com/post/reliable_ordered_messages/) @cancelled (2017-11-5 21:29:25) // too complicated and unnecessary (will never be able to bundle up small packets in time)
+    ✘ Packet fragmentation support for all reliable channels (MTU) @cancelled (2017-11-9 17:29:33) // too overkill and unnecessary atm
+    ✘ Large Packet sends? (https://gafferongames.com/post/sending_large_blocks_of_data/) @cancelled (2017-11-9 17:29:34) // too overkill and unnecessary atm
+    ✔ Sessions @done (2017-11-11 17:03:57)
+        ✔ Connect @done (2017-11-11 12:42:06)
+        ✔ Disconnect @done (2017-11-11 12:55:42)
+        ✔ Timeout @done (2017-11-11 15:42:21)
+        ✔ automatic cleanup (finish go-routines, release buffers, ...) @done (2017-11-11 17:03:54)
+    ✔ Congestion avoidance (RTT) (https://gafferongames.com/post/reliability_ordering_and_congestion_avoidance_over_udp/) @done (2017-11-12 14:54:41)
+        ✔ reduce unreliable send rate @done (2017-11-12 14:43:28)
+        ✔ reduce resend intervals @done (2017-11-11 23:03:38)
+        ✔ reduce resend amounts @done (2017-11-11 23:10:45)
+        ✔ reduce ack intervals @done (2017-11-11 23:03:37)
+    ✔ Connection state (drop double connection packets) @done (2017-11-12 16:16:42)
+    ✔ Pings + Max Ping + Ping Packets @done (2017-11-12 17:17:07)
+    ✘ Encryption @cancelled (2017-11-12 17:54:59) // too complicated, unnecessary and also unnecessarily performance intensive on mobile devices
+    ✔ Security (https://gafferongames.com/post/client_server_connection/) @done (2017-11-15 20:06:45)
+        ✔ client connection validation callback @done (2017-11-15 19:55:20)
+        ✔ clients only accept packets from server @done (2017-11-15 19:57:51)
+        ✔ check mtu (is it split up in different packages?) @done (2017-11-15 18:57:39)
+        ✘ flood protection @cancelled (2017-11-15 20:06:17) // maybe think about if it becomes a problem (which is very unlikely)
+        ✘ DoS protection @cancelled (2017-11-11 15:02:10) // https://www.ovh.de/anti-ddos/abwehr.xml
+
+For acks:
+    ✔ automatic resend @done (2017-11-5 15:54:25)
+    ✔ automatic empty ack packets if no traffic @done (2017-11-5 15:54:26)
+    ✔ handle duplicates @done (2017-11-5 16:44:40)
+    ✔ reset sequence buffers @done (2017-11-5 21:12:43)
+    ✘ handle acks outside of ack_bits range @cancelled (2017-11-6 20:59:54) // chose to just stop resending them after a certain amount of time => very likely that is was delivered
+    ✔ if packets stuck in send map for a long time remove them (possibility of delivery very high) @done (2017-11-6 21:54:06)
+    ✔ bigger sequence numbers @done (2017-11-8 21:44:45)
+
+Problems:
+    ☐ if a lot of packets are stored due to very high packet drop (e.g. 100%) a lot of packets will most likely not be acked (therefore may not arrive)
+        ☐ may be problematic with to small sequence buffer when old resend packets override newer ones in the same buffer slot
+        ☐ try to limit packet send when too many are stored (kind of congestion control) but ensure to not mimic tcp's bad behaviour
+        ☐ problematic if they "stuck" in sendMap and occupie memory
+        ☐ MaxPacketResends will get stuck resending the same packest on high packet loss => may cause even further congestion
+    ☐ if there is too much packet loss and ordered packets do not get through, they pile up and can potentionally interfere with the PacketChain (should at least not crash)
+        ☐ packet chain could get large with only a few elements missing (should consider max timeout and than execute order as it is present)
+    ☐ only works when both sides send reliable packest every so often (congestion control, ping, etc...)
+
+Library:
+    ✔ Packet processing @done (2017-11-18 18:31:18)
+    ✔ convention for creating structs @done (2017-11-18 17:33:59)
+    ✔ remove pooling @done (2017-11-17 21:51:24)
+    ✔ check todos @done (2017-11-17 22:50:05)
+    ✔ optimized gc? @done (2017-11-17 21:52:07)
+    ✔ use channels (https://gist.github.com/jtblin/18df559cf14438223f93#file-udp-server-go) @done (2017-11-18 17:09:48)
+        ✔ send/receive queue (channel) and seperate update goroutine to properly sync everything (get rid of mutexes?) @done (2017-11-18 17:09:45)
+    ✔ use more pooling? @done (2017-11-17 21:51:29)
+    ✔ only send after connection was established @done (2017-11-19 12:08:15)
+    ✔ panic handling (think about pooled object releases) @done (2017-11-19 19:46:08)
+    ✔ congestion handler really good made? (.mul() & .div()) @done (2017-11-19 20:58:43)
+    ✔ Config support @done (2017-11-19 22:32:58)
+    ✔ Event callbacks @done (2017-11-20 15:29:47)
+    ✔ try to reduce memory cost @done (2017-11-20 15:41:51)
+    ✔ bandwidth usage calculations (other stat stuff => prometheus?) @done (2017-11-20 16:21:59)
+    ✘ use atomics? @cancelled (2017-11-18 17:28:26) // maybe later if proven necessary
+    ✘ use lock-free data structure? (no mutexes) @cancelled (2017-11-17 22:58:54) // not necessary at the moment (probably never will)
+    
+    ☐ Format / check public/private names
+    ☐ subfolders
+    ☐ Make actual library
+        """A good design is to make your type unexported, but provide an exported constructor function like NewMyType()
+        in which you can properly initialize your struct / type. Also return an interface type and not a concrete type,
+        and the interface should contain everything others want to do with your value. And your concrete type must
+        implement that interface of course."""
+        https://stackoverflow.com/questions/37135193/how-to-set-default-values-in-golang-structs
+    ☐ Remove/replace logs with useful once
+    ☐ Documentation & Comments
+    
+    ☐ tests?
+
+Code Review:
+    ☐ no unnecessary copies?
+    ☐ data passed between go-routines correctly handled in context?
+    ☐ profile & memory leak/pooling check
