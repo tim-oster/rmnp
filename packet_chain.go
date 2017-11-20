@@ -8,12 +8,10 @@ import (
 	"sync"
 )
 
-const maxPacketChainLength = 255
-
 type packetChain struct {
 	next   orderNumber
 	start  *chainLink
-	length int
+	length byte
 	mutex  sync.Mutex
 }
 
@@ -59,11 +57,12 @@ func (chain *packetChain) Chain(packet *Packet) {
 		}
 	}
 
-	chain.length++
-
-	if chain.length > maxPacketChainLength {
+	if chain.length >= MaxPacketChainLength {
 		chain.start = chain.start.next
+		chain.length--
 	}
+
+	chain.length++
 }
 
 func (chain *packetChain) PopConsecutive() *chainLink {

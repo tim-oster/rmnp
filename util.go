@@ -9,7 +9,7 @@ import (
 	"time"
 	"fmt"
 	"net"
-	"github.com/joaojeronimo/go-crc16"
+	"hash/crc32"
 )
 
 func checkError(msg string, err error) {
@@ -32,9 +32,9 @@ func antiPanic(callback func()) {
 	}
 }
 
-func addrHash(addr *net.UDPAddr) uint16 {
+func addrHash(addr *net.UDPAddr) uint32 {
 	port := cnvUint32(uint32(addr.Port))
-	return crc16.Crc16(append(addr.IP, port...))
+	return crc32.ChecksumIEEE(append(addr.IP, port...))
 }
 
 func cnvUint32(i uint32) []byte {

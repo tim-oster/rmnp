@@ -10,8 +10,9 @@ var (
 	MTU             = 1024
 	ProtocolId byte = 231
 
-	ParallelListenerCount   = 4
-	MaxSendReceiveQueueSize = 100
+	ParallelListenerCount        = 4
+	MaxSendReceiveQueueSize      = 100
+	MaxPacketChainLength    byte = 255
 )
 
 var (

@@ -48,7 +48,7 @@ type protocolImpl struct {
 	waitGroup sync.WaitGroup
 
 	connectionsMutex sync.RWMutex
-	connections      map[uint16]*Connection
+	connections      map[uint32]*Connection
 	readFunc         ReadFunc
 	writeFunc        WriteFunc
 
@@ -69,7 +69,7 @@ func (impl *protocolImpl) init(address string) {
 	checkError("Failed to resolve udp address", err)
 
 	impl.address = addr
-	impl.connections = make(map[uint16]*Connection)
+	impl.connections = make(map[uint32]*Connection)
 
 	impl.bufferPool = sync.Pool{
 		New: func() interface{} { return make([]byte, MTU) },
