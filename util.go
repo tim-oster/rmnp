@@ -69,7 +69,7 @@ func differenceSequence(s1, s2 sequenceNumber) sequenceNumber {
 	}
 }
 
-func Min(x, y int64) int64 {
+func min(x, y int64) int64 {
 	if x < y {
 		return x
 	}
@@ -77,7 +77,7 @@ func Min(x, y int64) int64 {
 	return y
 }
 
-func Max(x, y int64) int64 {
+func max(x, y int64) int64 {
 	if x > y {
 		return x
 	}

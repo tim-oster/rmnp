@@ -49,7 +49,7 @@ func (buffer *SequenceBuffer) Get(sequence sequenceNumber) bool {
 func (buffer *SequenceBuffer) Set(sequence sequenceNumber, value bool) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
-	
+
 	if sequence < 0 {
 		sequence += buffer.size
 	}

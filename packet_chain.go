@@ -4,9 +4,7 @@
 
 package rmnp
 
-import (
-	"sync"
-)
+import "sync"
 
 type packetChain struct {
 	next   orderNumber

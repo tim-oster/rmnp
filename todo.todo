@@ -17,7 +17,6 @@ Problems:
         ☐ MaxPacketResends will get stuck resending the same packest on high packet loss => may cause even further congestion
     ☐ if there is too much packet loss and ordered packets do not get through, they pile up and can potentionally interfere with the PacketChain (should at least not crash)
         ☐ packet chain could get large with only a few elements missing (should consider max timeout and than execute order as it is present)
-    ☐ only works when both sides send reliable packest every so often (congestion control, ping, etc...)
 
 Library:
     ☐ Format / check public/private names

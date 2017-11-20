@@ -1,3 +1,7 @@
+// Copyright 2017 Tim Oster. All rights reserved.
+// Use of this source code is governed by the MIT license.
+// More information can be found in the LICENSE file.
+
 package rmnp
 
 import "fmt"
@@ -53,12 +57,12 @@ func (handler *congestionHandler) check(sendTime int64) {
 	case Good:
 		if rtt > CongestionThreshold {
 			if time-handler.lastChangeTime <= BadRTTPunishTimeout {
-				handler.requiredTime = Min(MaxCongestionRequiredTime, handler.requiredTime*2)
+				handler.requiredTime = min(MaxCongestionRequiredTime, handler.requiredTime*2)
 			}
 
 			handler.changeMode(Bad)
 		} else if time-handler.lastChangeTime >= GoodRTTRewardInterval {
-			handler.requiredTime = Max(1, handler.requiredTime/2)
+			handler.requiredTime = max(1, handler.requiredTime/2)
 			handler.lastChangeTime = time
 		}
 	case Bad:
