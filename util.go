@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"hash/crc32"
+	"sync/atomic"
 )
 
 func checkError(msg string, err error) {
@@ -21,6 +22,7 @@ func checkError(msg string, err error) {
 
 func antiPanic(callback func()) {
 	if err := recover(); err != nil {
+		atomic.AddUint64(&StatGoRoutinePanics, 1)
 		fmt.Println("panic:", err)
 
 		if callback != nil {

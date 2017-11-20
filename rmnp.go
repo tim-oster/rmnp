@@ -10,6 +10,7 @@ import (
 	"context"
 	"time"
 	"sync"
+	"sync/atomic"
 )
 
 type ConnectionCallback func(*Connection)
@@ -156,6 +157,7 @@ func (impl *protocolImpl) listeningWorker() {
 
 			packet := make([]byte, length)
 			copy(packet, sizedBuffer)
+			atomic.AddUint64(&StatReceivedBytes, uint64(length))
 
 			impl.handlePacket(addr, packet)
 		}()
@@ -195,10 +197,13 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		return
 	}
 
+	atomic.AddUint64(&StatProcessedBytes, uint64(len(packet)))
 	connection.receiveQueue <- packet
 }
 
 func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
+	atomic.AddUint64(&StatConnects, 1)
+
 	hash := addrHash(addr)
 
 	connection := impl.connectionPool.Get().(*Connection)
@@ -218,6 +223,8 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	if connection.state == Disconnected {
 		return
 	}
+
+	atomic.AddUint64(&StatDisconnects, 1)
 
 	connection.state = Disconnected
 
@@ -247,6 +254,7 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 }
 
 func (impl *protocolImpl) timeoutClient(connection *Connection) {
+	atomic.AddUint64(&StatTimeouts, 1)
 	invokeConnectionCallback(impl.onTimeout, connection)
 	impl.disconnectClient(connection, false)
 }

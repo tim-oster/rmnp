@@ -10,6 +10,7 @@ import (
 	"time"
 	"context"
 	"sync"
+	"sync/atomic"
 )
 
 type connectionState uint8
@@ -157,6 +158,8 @@ func (c *Connection) sendUpdate() {
 		if c.state != Connected {
 			continue
 		}
+
+		fmt.Println(StatSendBytes)
 
 		if currentTime-c.lastSendTime > c.congestionHandler.ReackTimeout {
 			c.sendAckPacket()
@@ -357,6 +360,7 @@ func (c *Connection) processSend(packet *Packet, resend bool) {
 	packet.CalculateHash()
 	buffer := packet.Serialize()
 	c.protocol.writeFunc(c, buffer)
+	atomic.AddUint64(&StatSendBytes, uint64(len(buffer)))
 
 	c.lastSendTime = currentTime()
 }
@@ -373,6 +377,6 @@ func (c *Connection) sendAckPacket() {
 	c.sendLowLevelPacket(Ack)
 }
 
-func (c *Connection) GetPing() int {
-	return int32(c.congestionHandler.rtt / 2)
+func (c *Connection) GetPing() int16 {
+	return int16(c.congestionHandler.rtt / 2)
 }
