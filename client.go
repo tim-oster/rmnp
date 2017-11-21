@@ -12,6 +12,11 @@ import (
 type Client struct {
 	protocolImpl
 	server *Connection
+
+	ServerConnect    ConnectionCallback
+	ServerDisconnect ConnectionCallback
+	ServerTimeout    ConnectionCallback
+	PacketHandler    PacketCallback
 }
 
 func NewClient(server string) *Client {
@@ -33,23 +38,38 @@ func NewClient(server string) *Client {
 
 	c.onConnect = func(connection *Connection) {
 		fmt.Println("connected to server")
+
+		if c.ServerConnect != nil {
+			c.ServerConnect(connection)
+		}
 	}
 
 	c.onDisconnect = func(connection *Connection) {
 		fmt.Println("disconnected from server")
+
+		if c.ServerDisconnect != nil {
+			c.ServerDisconnect(connection)
+		}
+
 		c.destroy()
 	}
 
 	c.onTimeout = func(connection *Connection) {
 		fmt.Println("timeout")
+
+		if c.ServerTimeout != nil {
+			c.ServerTimeout(connection)
+		}
 	}
 
 	c.onValidation = func(connection *Connection, addr *net.UDPAddr, packet []byte) bool {
 		return false
 	}
 
-	c.onPacket = func(connection *Connection, packet *packet) {
-		fmt.Println(string(packet.data))
+	c.onPacket = func(connection *Connection, packet []byte) {
+		if c.PacketHandler != nil {
+			c.PacketHandler(connection, packet)
+		}
 	}
 
 	c.init(server)
@@ -65,4 +85,20 @@ func (c *Client) Connect() {
 func (c *Client) Disconnect() {
 	c.destroy()
 	c.server = nil
+}
+
+func (c *Client) SendUnreliable(data []byte) {
+	c.server.SendUnreliable(data)
+}
+
+func (c *Client) SendUnreliableOrdered(data []byte) {
+	c.server.SendUnreliableOrdered(data)
+}
+
+func (c *Client) SendReliable(data []byte) {
+	c.server.SendReliable(data)
+}
+
+func (c *Client) SendReliableOrdered(data []byte) {
+	c.server.SendReliableOrdered(data)
 }

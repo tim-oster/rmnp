@@ -19,9 +19,9 @@ Problems:
         ☐ packet chain could get large with only a few elements missing (should consider max timeout and than execute order as it is present)
 
 Library:
+    ☐ tests?
     ☐ Remove/replace logs with useful once
     ☐ Documentation & Comments
-    ☐ tests?
 
 Code Review:
     ☐ no unnecessary copies?

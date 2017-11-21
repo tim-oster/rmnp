@@ -42,7 +42,7 @@ type Connection struct {
 	localUnreliableSequence  sequenceNumber
 	remoteUnreliableSequence sequenceNumber
 
-	lastSendTime       int64
+	lastAckSendTime    int64
 	lastResendTime     int64
 	lastReceivedTime   int64
 	pingPacketInterval uint8
@@ -53,6 +53,8 @@ type Connection struct {
 	sendQueue    chan *packet
 	receiveQueue chan []byte
 	waitGroup    sync.WaitGroup
+
+	Values map[string]interface{}
 }
 
 func newConnection() *Connection {
@@ -64,6 +66,7 @@ func newConnection() *Connection {
 		congestionHandler: newCongestionHandler(),
 		sendQueue:         make(chan *packet, CfgMaxSendReceiveQueueSize),
 		receiveQueue:      make(chan []byte, CfgMaxSendReceiveQueueSize),
+		Values:            make(map[string]interface{}),
 	}
 }
 
@@ -74,7 +77,7 @@ func (c *Connection) init(impl *protocolImpl, addr *net.UDPAddr) {
 	c.state = stateConnecting
 
 	t := currentTime()
-	c.lastSendTime = t
+	c.lastAckSendTime = t
 	c.lastResendTime = t
 	c.lastReceivedTime = t
 }
@@ -98,7 +101,7 @@ func (c *Connection) reset() {
 	c.localUnreliableSequence = 0
 	c.remoteUnreliableSequence = 0
 
-	c.lastSendTime = 0
+	c.lastAckSendTime = 0
 	c.lastResendTime = 0
 	c.lastReceivedTime = 0
 	c.pingPacketInterval = 0
@@ -111,6 +114,8 @@ func (c *Connection) reset() {
 			break
 		}
 	}
+
+	c.Values = make(map[string]interface{})
 }
 
 func (c *Connection) startRoutines() {
@@ -159,11 +164,11 @@ func (c *Connection) sendUpdate() {
 			continue
 		}
 
-		if currentTime-c.lastSendTime > c.congestionHandler.ReackTimeout {
+		if currentTime-c.lastAckSendTime > c.congestionHandler.ReackTimeout {
 			c.sendAckPacket()
 
 			if c.pingPacketInterval%CfgAutoPingInterval == 0 {
-				c.sendLowLevelPacket(descReliable)
+				c.sendLowLevelPacket(descReliable | descAck)
 				c.pingPacketInterval = 0
 			}
 
@@ -244,9 +249,7 @@ func (c *Connection) processReceive(buffer []byte) {
 		return
 	}
 
-	if p.data != nil {
-		c.process(p)
-	}
+	c.process(p)
 }
 
 func (c *Connection) handleReliablePacket(packet *packet) bool {
@@ -314,7 +317,9 @@ func (c *Connection) handleAckPacket(packet *packet) bool {
 }
 
 func (c *Connection) process(packet *packet) {
-	invokePacketCallback(c.protocol.onPacket, c, packet)
+	if packet.data != nil && len(packet.data) > 0 {
+		invokePacketCallback(c.protocol.onPacket, c, packet.data)
+	}
 }
 
 func (c *Connection) processSend(packet *packet, resend bool) {
@@ -342,6 +347,7 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 	}
 
 	if packet.flag(descAck) {
+		c.lastAckSendTime = currentTime()
 		packet.ack = c.remoteSequence
 		packet.ackBits = c.ackBits
 	}
@@ -359,20 +365,38 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 	buffer := packet.serialize()
 	c.protocol.writeFunc(c, buffer)
 	atomic.AddUint64(&StatSendBytes, uint64(len(buffer)))
-
-	c.lastSendTime = currentTime()
 }
 
-func (c *Connection) SendPacket(packet *packet) {
+func (c *Connection) sendPacket(packet *packet) {
 	c.sendQueue <- packet
 }
 
 func (c *Connection) sendLowLevelPacket(descriptor descriptor) {
-	c.SendPacket(&packet{descriptor: descriptor})
+	c.sendPacket(&packet{descriptor: descriptor})
+}
+
+func (c *Connection) sendHighLevelPacket(descriptor descriptor, data []byte) {
+	c.sendPacket(&packet{descriptor: descriptor, data: data})
 }
 
 func (c *Connection) sendAckPacket() {
 	c.sendLowLevelPacket(descAck)
+}
+
+func (c *Connection) SendUnreliable(data []byte) {
+	c.sendHighLevelPacket(0, data)
+}
+
+func (c *Connection) SendUnreliableOrdered(data []byte) {
+	c.sendHighLevelPacket(descOrdered, data)
+}
+
+func (c *Connection) SendReliable(data []byte) {
+	c.sendHighLevelPacket(descReliable|descAck, data)
+}
+
+func (c *Connection) SendReliableOrdered(data []byte) {
+	c.sendHighLevelPacket(descReliable|descAck|descOrdered, data)
 }
 
 func (c *Connection) GetPing() int16 {

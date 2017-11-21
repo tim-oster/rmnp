@@ -11,6 +11,12 @@ import (
 
 type Server struct {
 	protocolImpl
+
+	ClientConnect    ConnectionCallback
+	ClientDisconnect ConnectionCallback
+	ClientTimeout    ConnectionCallback
+	ClientValidation ValidationCallback
+	PacketHandler    PacketCallback
 }
 
 func NewServer(address string) *Server {
@@ -32,22 +38,40 @@ func NewServer(address string) *Server {
 
 	s.onConnect = func(connection *Connection) {
 		fmt.Println("client connected:", connection.Addr)
+
+		if s.ClientConnect != nil {
+			s.ClientConnect(connection)
+		}
 	}
 
 	s.onDisconnect = func(connection *Connection) {
 		fmt.Println("client disconnect:", connection.Addr)
+
+		if s.ClientDisconnect != nil {
+			s.ClientDisconnect(connection)
+		}
 	}
 
 	s.onTimeout = func(connection *Connection) {
 		fmt.Println("timeout:", connection.Addr)
+
+		if s.ClientTimeout != nil {
+			s.ClientTimeout(connection)
+		}
 	}
 
 	s.onValidation = func(connection *Connection, addr *net.UDPAddr, packet []byte) bool {
+		if s.ClientValidation != nil {
+			return s.ClientValidation(connection, addr, packet)
+		}
+
 		return true
 	}
 
-	s.onPacket = func(connection *Connection, packet *packet) {
-		fmt.Println(packet.data)
+	s.onPacket = func(connection *Connection, packet []byte) {
+		if s.PacketHandler != nil {
+			s.PacketHandler(connection, packet)
+		}
 	}
 
 	s.init(address)

@@ -15,7 +15,7 @@ import (
 
 type ConnectionCallback func(*Connection)
 type ValidationCallback func(*Connection, *net.UDPAddr, []byte) bool
-type PacketCallback func(*Connection, *packet)
+type PacketCallback func(*Connection, []byte)
 
 func invokeConnectionCallback(callback ConnectionCallback, connection *Connection) {
 	if callback != nil {
@@ -31,7 +31,7 @@ func invokeValidationCallback(callback ValidationCallback, connection *Connectio
 	return true
 }
 
-func invokePacketCallback(callback PacketCallback, connection *Connection, packet *packet) {
+func invokePacketCallback(callback PacketCallback, connection *Connection, packet []byte) {
 	if callback != nil {
 		callback(connection, packet)
 	}
@@ -97,14 +97,6 @@ func (impl *protocolImpl) destroy() {
 	impl.cancel = nil
 
 	impl.connections = nil
-	impl.readFunc = nil
-	impl.writeFunc = nil
-
-	impl.onConnect = nil
-	impl.onDisconnect = nil
-	impl.onTimeout = nil
-	impl.onValidation = nil
-	impl.onPacket = nil
 }
 
 func (impl *protocolImpl) setSocket(socket *net.UDPConn, err error) {
