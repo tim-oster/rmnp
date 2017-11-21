@@ -151,7 +151,7 @@ func headerSize(packet []byte) int {
 
 	if desc&descReliable != 0 && desc&descOrdered != 0 {
 		// order (1)
-		size += 2
+		size += 1
 	}
 
 	if desc&descAck != 0 {
