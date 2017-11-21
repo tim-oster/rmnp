@@ -42,7 +42,7 @@ func TestPacketSerialization(t *testing.T) {
 	s := newTestPacket()
 	d := new(packet)
 
-	s.data = []byte{0, 0, 0, 0, 0, 0, 0, 0}
+	s.data = []byte{0, 1, 2, 3, 4, 5, 6, 7}
 	d.deserialize(s.serialize())
 
 	if d.protocolId != s.protocolId {
