@@ -19,12 +19,10 @@ Problems:
         ☐ packet chain could get large with only a few elements missing (should consider max timeout and than execute order as it is present)
 
 Library:
-    ☐ tests?
-    ☐ Remove/replace logs with useful once
-    ☐ Documentation & Comments
-
-Code Review:
-    ☐ no unnecessary copies?
-    ☐ data passed between go-routines correctly handled in context?
     ☐ profile & memory leak/pooling check
     ☐ profile StatSendBytes & StatReceivedBytes
+    ☐ Code Review
+        ☐ Documentation & Comments
+        ☐ Remove/replace logs with useful once
+        ☐ no unnecessary copies?
+        ☐ data passed between go-routines correctly handled in context?
