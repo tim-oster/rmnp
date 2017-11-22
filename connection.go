@@ -35,7 +35,7 @@ type Connection struct {
 	localSequence   sequenceNumber
 	remoteSequence  sequenceNumber
 	ackBits         uint32
-	orderedChain    *packetChain
+	orderedChain    *chain
 	orderedSequence orderNumber
 
 	// for Unreliable Ordered packets
@@ -60,7 +60,7 @@ type Connection struct {
 func newConnection() *Connection {
 	return &Connection{
 		state:             stateDisconnected,
-		orderedChain:      newPacketChain(),
+		orderedChain:      newChain(),
 		sendBuffer:        newSendBuffer(),
 		receiveBuffer:     newSequenceBuffer(CfgSequenceBufferSize),
 		congestionHandler: newCongestionHandler(),

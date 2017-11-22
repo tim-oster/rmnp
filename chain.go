@@ -6,7 +6,7 @@ package rmnp
 
 import "sync"
 
-type packetChain struct {
+type chain struct {
 	next   orderNumber
 	start  *chainLink
 	length byte
@@ -18,11 +18,11 @@ type chainLink struct {
 	packet *packet
 }
 
-func newPacketChain() *packetChain {
-	return new(packetChain)
+func newChain() *chain {
+	return new(chain)
 }
 
-func (chain *packetChain) reset() {
+func (chain *chain) reset() {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
@@ -31,7 +31,7 @@ func (chain *packetChain) reset() {
 	chain.length = 0
 }
 
-func (chain *packetChain) chain(packet *packet) {
+func (chain *chain) chain(packet *packet) {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
@@ -63,7 +63,7 @@ func (chain *packetChain) chain(packet *packet) {
 	chain.length++
 }
 
-func (chain *packetChain) popConsecutive() *chainLink {
+func (chain *chain) popConsecutive() *chainLink {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
