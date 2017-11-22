@@ -7,10 +7,11 @@ package rmnp
 import "sync"
 
 type chain struct {
-	next   orderNumber
-	start  *chainLink
-	length byte
-	mutex  sync.Mutex
+	next      orderNumber
+	start     *chainLink
+	length    byte
+	maxLength byte
+	mutex     sync.Mutex
 }
 
 type chainLink struct {
@@ -18,8 +19,8 @@ type chainLink struct {
 	packet *packet
 }
 
-func newChain() *chain {
-	return new(chain)
+func newChain(maxLength byte) *chain {
+	return &chain{maxLength: maxLength}
 }
 
 func (chain *chain) reset() {
@@ -29,6 +30,7 @@ func (chain *chain) reset() {
 	chain.next = 0
 	chain.start = nil
 	chain.length = 0
+	chain.maxLength = 0
 }
 
 func (chain *chain) chain(packet *packet) {
@@ -55,7 +57,7 @@ func (chain *chain) chain(packet *packet) {
 		}
 	}
 
-	if chain.length >= CfgMaxPacketChainLength {
+	if chain.length >= chain.maxLength {
 		chain.start = chain.start.next
 		chain.length--
 	}

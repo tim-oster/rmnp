@@ -60,7 +60,7 @@ type Connection struct {
 func newConnection() *Connection {
 	return &Connection{
 		state:             stateDisconnected,
-		orderedChain:      newChain(),
+		orderedChain:      newChain(CfgMaxPacketChainLength),
 		sendBuffer:        newSendBuffer(),
 		receiveBuffer:     newSequenceBuffer(CfgSequenceBufferSize),
 		congestionHandler: newCongestionHandler(),
