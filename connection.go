@@ -131,6 +131,9 @@ func (c *Connection) sendUpdate() {
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
 
+	atomic.AddUint64(&StatRunningRoutines, 1)
+	defer atomic.AddUint64(&StatRunningRoutines, -1)
+
 	for {
 		select {
 		case <-time.After(CfgUpdateLoopInterval * time.Millisecond):
@@ -183,6 +186,9 @@ func (c *Connection) receiveUpdate() {
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
 
+	atomic.AddUint64(&StatRunningRoutines, 1)
+	defer atomic.AddUint64(&StatRunningRoutines, -1)
+
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -198,6 +204,9 @@ func (c *Connection) keepAlive() {
 
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
+
+	atomic.AddUint64(&StatRunningRoutines, 1)
+	defer atomic.AddUint64(&StatRunningRoutines, -1)
 
 	for {
 		select {

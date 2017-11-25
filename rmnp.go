@@ -120,6 +120,9 @@ func (impl *protocolImpl) listeningWorker() {
 	impl.waitGroup.Add(1)
 	defer impl.waitGroup.Done()
 
+	atomic.AddUint64(&StatRunningRoutines, 1)
+	defer atomic.AddUint64(&StatRunningRoutines, -1)
+
 	for {
 		select {
 		case <-impl.ctx.Done():

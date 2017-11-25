@@ -9,6 +9,7 @@ var (
 	StatReceivedBytes  uint64 = 0
 	StatProcessedBytes uint64 = 0
 
+	StatRunningRoutines uint64 = 0
 	StatGoRoutinePanics uint64 = 0
 
 	StatConnects    uint64 = 0
