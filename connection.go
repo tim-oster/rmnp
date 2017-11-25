@@ -45,6 +45,7 @@ type Connection struct {
 	lastAckSendTime    int64
 	lastResendTime     int64
 	lastReceivedTime   int64
+	lastChainTime      int64
 	pingPacketInterval uint8
 	sendBuffer         *sendBuffer
 	receiveBuffer      *sequenceBuffer
@@ -104,6 +105,7 @@ func (c *Connection) reset() {
 	c.lastAckSendTime = 0
 	c.lastResendTime = 0
 	c.lastReceivedTime = 0
+	c.lastChainTime = 0
 	c.pingPacketInterval = 0
 
 	for {
@@ -165,6 +167,11 @@ func (c *Connection) sendUpdate() {
 
 		if c.state != stateConnected {
 			continue
+		}
+
+		if currentTime-c.lastChainTime > CfgChainSkipTimeout {
+			c.orderedChain.skip()
+			c.handleNextChainSequence()
 		}
 
 		if currentTime-c.lastAckSendTime > c.congestionHandler.ReackTimeout {
@@ -293,10 +300,7 @@ func (c *Connection) handleReliablePacket(packet *packet) bool {
 func (c *Connection) handleOrderedPacket(packet *packet) bool {
 	if packet.flag(descReliable) {
 		c.orderedChain.chain(packet)
-
-		for l := c.orderedChain.popConsecutive(); l != nil; l = l.next {
-			c.process(l.packet)
-		}
+		c.handleNextChainSequence()
 	} else {
 		if greaterThanSequence(packet.sequence, c.remoteUnreliableSequence) {
 			c.remoteUnreliableSequence = packet.sequence
@@ -328,6 +332,14 @@ func (c *Connection) handleAckPacket(packet *packet) bool {
 func (c *Connection) process(packet *packet) {
 	if packet.data != nil && len(packet.data) > 0 {
 		invokePacketCallback(c.protocol.onPacket, c, packet.data)
+	}
+}
+
+func (c *Connection) handleNextChainSequence() {
+	c.lastChainTime = currentTime()
+
+	for l := c.orderedChain.popConsecutive(); l != nil; l = l.next {
+		c.process(l.packet)
 	}
 }
 

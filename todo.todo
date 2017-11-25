@@ -1,16 +1,4 @@
-Problems:
-    ☐ if a lot of packets are stored due to very high packet drop (e.g. 100%) a lot of packets will most likely not be acked (therefore may not arrive)
-        ☐ may be problematic with to small sequence buffer when old resend packets override newer ones in the same buffer slot
-        ☐ try to limit packet send when too many are stored (kind of congestion control) but ensure to not mimic tcp's bad behaviour
-        ☐ problematic if they "stuck" in sendMap and occupie memory
-        ☐ MaxPacketResends will get stuck resending the same packest on high packet loss => may cause even further congestion
-    ☐ if there is too much packet loss and ordered packets do not get through, they pile up and can potentionally interfere with the PacketChain (should at least not crash)
-        ☐ packet chain could get large with only a few elements missing (should consider max timeout and than execute order as it is present)
-
 Library:
-    ☐ goroutine leaks
-    ☐ test object pooling (fluctuating connections)
-    ☐ profile StatSendBytes & StatReceivedBytes
     ☐ Code Review
         ☐ Documentation & Comments
         ☐ Remove/replace logs with useful once

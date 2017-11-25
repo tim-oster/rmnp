@@ -22,6 +22,7 @@ var (
 
 	CfgUpdateLoopInterval time.Duration = 10
 	CfgSendRemoveTimeout  int64         = 1600
+	CfgChainSkipTimeout   int64         = 3000
 	CfgAutoPingInterval   uint8         = 15
 )
 

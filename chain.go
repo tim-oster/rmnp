@@ -90,3 +90,12 @@ func (chain *chain) popConsecutive() *chainLink {
 
 	return nil
 }
+
+func (chain *chain) skip() {
+	chain.mutex.Lock()
+	defer chain.mutex.Unlock()
+
+	if chain.start != nil {
+		chain.next = chain.start.packet.order
+	}
+}
