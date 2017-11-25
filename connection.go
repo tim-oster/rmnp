@@ -132,7 +132,7 @@ func (c *Connection) sendUpdate() {
 	defer c.waitGroup.Done()
 
 	atomic.AddUint64(&StatRunningRoutines, 1)
-	defer atomic.AddUint64(&StatRunningRoutines, -1)
+	defer atomic.AddUint64(&StatRunningRoutines, ^uint64(0))
 
 	for {
 		select {
@@ -187,7 +187,7 @@ func (c *Connection) receiveUpdate() {
 	defer c.waitGroup.Done()
 
 	atomic.AddUint64(&StatRunningRoutines, 1)
-	defer atomic.AddUint64(&StatRunningRoutines, -1)
+	defer atomic.AddUint64(&StatRunningRoutines, ^uint64(0))
 
 	for {
 		select {
@@ -206,7 +206,7 @@ func (c *Connection) keepAlive() {
 	defer c.waitGroup.Done()
 
 	atomic.AddUint64(&StatRunningRoutines, 1)
-	defer atomic.AddUint64(&StatRunningRoutines, -1)
+	defer atomic.AddUint64(&StatRunningRoutines, ^uint64(0))
 
 	for {
 		select {

@@ -121,7 +121,7 @@ func (impl *protocolImpl) listeningWorker() {
 	defer impl.waitGroup.Done()
 
 	atomic.AddUint64(&StatRunningRoutines, 1)
-	defer atomic.AddUint64(&StatRunningRoutines, -1)
+	defer atomic.AddUint64(&StatRunningRoutines, ^uint64(0))
 
 	for {
 		select {
