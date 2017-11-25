@@ -249,7 +249,6 @@ func (c *Connection) processReceive(buffer []byte) {
 	}
 
 	if !p.deserialize(buffer) {
-		fmt.Println("error during data deserialization")
 		return
 	}
 
@@ -269,10 +268,7 @@ func (c *Connection) processReceive(buffer []byte) {
 }
 
 func (c *Connection) handleReliablePacket(packet *packet) bool {
-	fmt.Println("recveived sequences #", packet.sequence)
-
 	if c.receiveBuffer.get(packet.sequence) {
-		fmt.Println(":: was duplicate")
 		return false
 	}
 
@@ -320,8 +316,6 @@ func (c *Connection) handleAckPacket(packet *packet) bool {
 				if !packet.noRTT {
 					c.congestionHandler.check(packet.sendTime)
 				}
-
-				fmt.Println("#", s, "acked")
 			}
 		}
 	}
@@ -371,15 +365,6 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 		c.lastAckSendTime = currentTime()
 		packet.ack = c.remoteSequence
 		packet.ackBits = c.ackBits
-	}
-
-	if packet.flag(descReliable) {
-		fmt.Print("data sequences #", packet.sequence)
-		if resend {
-			fmt.Println(" resend")
-		} else {
-			fmt.Println()
-		}
 	}
 
 	packet.calculateHash()

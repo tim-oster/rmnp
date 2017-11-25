@@ -146,7 +146,6 @@ func (impl *protocolImpl) listeningWorker() {
 			sizedBuffer := buffer[:length]
 
 			if !validateHeader(sizedBuffer) {
-				fmt.Println("error during sending")
 				return
 			}
 
@@ -168,13 +167,11 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 
 	if !exists {
 		if descriptor(packet[5])&descConnect == 0 {
-			fmt.Println("no connect data data")
 			return
 		}
 
 		header := headerSize(packet)
 		if !invokeValidationCallback(impl.onValidation, nil, addr, packet[header:]) {
-			fmt.Println("connection rejected")
 			return
 		}
 

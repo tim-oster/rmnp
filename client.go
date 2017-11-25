@@ -37,16 +37,12 @@ func NewClient(server string) *Client {
 	}
 
 	c.onConnect = func(connection *Connection) {
-		fmt.Println("connected to server")
-
 		if c.ServerConnect != nil {
 			c.ServerConnect(connection)
 		}
 	}
 
 	c.onDisconnect = func(connection *Connection) {
-		fmt.Println("disconnected from server")
-
 		if c.ServerDisconnect != nil {
 			c.ServerDisconnect(connection)
 		}
@@ -55,8 +51,6 @@ func NewClient(server string) *Client {
 	}
 
 	c.onTimeout = func(connection *Connection) {
-		fmt.Println("timeout")
-
 		if c.ServerTimeout != nil {
 			c.ServerTimeout(connection)
 		}

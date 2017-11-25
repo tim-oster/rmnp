@@ -84,12 +84,10 @@ func (handler *congestionHandler) changeMode(mode congestionMode) {
 		handler.ResendTimeout = CfgResendTimeout
 		handler.MaxPacketResends = CfgMaxPacketResends
 		handler.ReackTimeout = CfgReackTimeout
-		fmt.Println("============================> congestion mode: good")
 	case congestionModeBad:
 		handler.ResendTimeout = int64(float32(CfgResendTimeout) * CfgBadModeMultiplier)
 		handler.MaxPacketResends = int64(float32(CfgMaxPacketResends) / CfgBadModeMultiplier)
 		handler.ReackTimeout = int64(float32(CfgReackTimeout) * CfgBadModeMultiplier)
-		fmt.Println("============================> congestion mode: bad")
 	}
 
 	handler.mode = mode

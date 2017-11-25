@@ -37,24 +37,18 @@ func NewServer(address string) *Server {
 	}
 
 	s.onConnect = func(connection *Connection) {
-		fmt.Println("client connected:", connection.Addr)
-
 		if s.ClientConnect != nil {
 			s.ClientConnect(connection)
 		}
 	}
 
 	s.onDisconnect = func(connection *Connection) {
-		fmt.Println("client disconnect:", connection.Addr)
-
 		if s.ClientDisconnect != nil {
 			s.ClientDisconnect(connection)
 		}
 	}
 
 	s.onTimeout = func(connection *Connection) {
-		fmt.Println("timeout:", connection.Addr)
-
 		if s.ClientTimeout != nil {
 			s.ClientTimeout(connection)
 		}

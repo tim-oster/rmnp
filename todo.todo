@@ -1,6 +1,3 @@
 Library:
     ☐ Code Review
         ☐ Documentation & Comments
-        ☐ Remove/replace logs with useful once
-        ☐ no unnecessary copies?
-        ☐ data passed between go-routines correctly handled in context?
