@@ -4,21 +4,29 @@
 
 package rmnp
 
-import (
-	"net"
-	"fmt"
-)
+import "net"
 
 type Server struct {
 	protocolImpl
 
-	ClientConnect    ConnectionCallback
+	// ClientConnect is invoked when a new client connects.
+	ClientConnect ConnectionCallback
+
+	// ClientDisconnect is invoked when a client disconnects.
 	ClientDisconnect ConnectionCallback
-	ClientTimeout    ConnectionCallback
+
+	// ClientTimeout is called when a client timed out. After that ClientDisconnect will be called.
+	ClientTimeout ConnectionCallback
+
+	// ClientValidation is called when a new client connects to either accept or deny the connection attempt.
 	ClientValidation ValidationCallback
-	PacketHandler    PacketCallback
+
+	// PacketHandler is called when packets arrive to handle the received data.
+	PacketHandler PacketCallback
 }
 
+// NewServer creates and returns a new Server instance that will listen on the
+// specified address and port. It does not start automatically.
 func NewServer(address string) *Server {
 	s := new(Server)
 
@@ -72,11 +80,15 @@ func NewServer(address string) *Server {
 	return s
 }
 
+// Start starts the server asynchronously. It invokes no callbacks but
+// the server is guaranteed to be running after this call.
 func (s *Server) Start() {
 	s.setSocket(net.ListenUDP("udp", s.address))
 	s.listen()
 }
 
+// Stop stops the server and disconnects all clients. It invokes no callbacks.
+// This call could take some time because it waits for goroutines to exit.
 func (s *Server) Stop() {
 	s.destroy()
 }

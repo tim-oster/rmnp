@@ -6,7 +6,6 @@ package rmnp
 
 import (
 	"net"
-	"fmt"
 	"context"
 	"time"
 	"sync"
@@ -120,8 +119,8 @@ func (impl *protocolImpl) listeningWorker() {
 	impl.waitGroup.Add(1)
 	defer impl.waitGroup.Done()
 
-	atomic.AddUint64(&StatRunningRoutines, 1)
-	defer atomic.AddUint64(&StatRunningRoutines, ^uint64(0))
+	atomic.AddUint64(&StatRunningGoRoutines, 1)
+	defer atomic.AddUint64(&StatRunningGoRoutines, ^uint64(0))
 
 	for {
 		select {
@@ -172,6 +171,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 
 		header := headerSize(packet)
 		if !invokeValidationCallback(impl.onValidation, nil, addr, packet[header:]) {
+			atomic.AddUint64(&StatDeniedConnects, 1)
 			return
 		}
 

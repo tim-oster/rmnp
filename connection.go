@@ -6,7 +6,6 @@ package rmnp
 
 import (
 	"net"
-	"fmt"
 	"time"
 	"context"
 	"sync"
@@ -23,22 +22,25 @@ const (
 
 type Connection struct {
 	protocol *protocolImpl
-	Conn     *net.UDPConn
-	Addr     *net.UDPAddr
 	state    connectionState
+
+	// Conn is the UDPConn to the this connection.
+	Conn *net.UDPConn
+	// Addr is the UDPAddr of this UDPConn.
+	Addr *net.UDPAddr
 
 	// for go routines
 	ctx          context.Context
 	stopRoutines context.CancelFunc
 
-	// for Reliable packets
+	// for reliable packets
 	localSequence   sequenceNumber
 	remoteSequence  sequenceNumber
 	ackBits         uint32
 	orderedChain    *chain
 	orderedSequence orderNumber
 
-	// for Unreliable Ordered packets
+	// for unreliable ordered packets
 	localUnreliableSequence  sequenceNumber
 	remoteUnreliableSequence sequenceNumber
 
@@ -55,6 +57,7 @@ type Connection struct {
 	receiveQueue chan []byte
 	waitGroup    sync.WaitGroup
 
+	// Values allow to store custom data for fast and easy packet handling.
 	Values map[string]interface{}
 }
 
@@ -85,9 +88,10 @@ func (c *Connection) init(impl *protocolImpl, addr *net.UDPAddr) {
 
 func (c *Connection) reset() {
 	c.protocol = nil
+	c.state = stateDisconnected
+
 	c.Conn = nil
 	c.Addr = nil
-	c.state = stateDisconnected
 
 	c.orderedChain.reset()
 	c.sendBuffer.reset()
@@ -133,12 +137,12 @@ func (c *Connection) sendUpdate() {
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
 
-	atomic.AddUint64(&StatRunningRoutines, 1)
-	defer atomic.AddUint64(&StatRunningRoutines, ^uint64(0))
+	atomic.AddUint64(&StatRunningGoRoutines, 1)
+	defer atomic.AddUint64(&StatRunningGoRoutines, ^uint64(0))
 
 	for {
 		select {
-		case <-time.After(CfgUpdateLoopInterval * time.Millisecond):
+		case <-time.After(CfgUpdateLoopTimeout * time.Millisecond):
 		case <-c.ctx.Done():
 			return
 		case packet := <-c.sendQueue:
@@ -193,8 +197,8 @@ func (c *Connection) receiveUpdate() {
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
 
-	atomic.AddUint64(&StatRunningRoutines, 1)
-	defer atomic.AddUint64(&StatRunningRoutines, ^uint64(0))
+	atomic.AddUint64(&StatRunningGoRoutines, 1)
+	defer atomic.AddUint64(&StatRunningGoRoutines, ^uint64(0))
 
 	for {
 		select {
@@ -212,8 +216,8 @@ func (c *Connection) keepAlive() {
 	c.waitGroup.Add(1)
 	defer c.waitGroup.Done()
 
-	atomic.AddUint64(&StatRunningRoutines, 1)
-	defer atomic.AddUint64(&StatRunningRoutines, ^uint64(0))
+	atomic.AddUint64(&StatRunningGoRoutines, 1)
+	defer atomic.AddUint64(&StatRunningGoRoutines, ^uint64(0))
 
 	for {
 		select {
@@ -389,22 +393,34 @@ func (c *Connection) sendAckPacket() {
 	c.sendLowLevelPacket(descAck)
 }
 
+// SendUnreliable sends the data with no guarantee whether it arrives or not.
+// Note that the packets or not guaranteed to arrive in order.
 func (c *Connection) SendUnreliable(data []byte) {
 	c.sendHighLevelPacket(0, data)
 }
 
+// SendUnreliableOrdered is the same as SendUnreliable but guarantees that if packets
+// do not arrive chronologically the receiver only accepts newer packets and discards older
+// ones.
 func (c *Connection) SendUnreliableOrdered(data []byte) {
 	c.sendHighLevelPacket(descOrdered, data)
 }
 
+// SendReliable send the data and guarantees that the data arrives.
+// Note that packets are not guaranteed to arrive in the order they were sent.
+// This method is not 100% reliable. (Read more in README)
 func (c *Connection) SendReliable(data []byte) {
 	c.sendHighLevelPacket(descReliable|descAck, data)
 }
 
+// SendReliableOrdered is the same as SendReliable but guarantees that packets
+// will be processed in order.
+// This method is not 100% reliable. (Read more in README)
 func (c *Connection) SendReliableOrdered(data []byte) {
 	c.sendHighLevelPacket(descReliable|descAck|descOrdered, data)
 }
 
+// GetPing returns the current ping to this connection's socket
 func (c *Connection) GetPing() int16 {
 	return int16(c.congestionHandler.rtt / 2)
 }

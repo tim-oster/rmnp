@@ -4,8 +4,6 @@
 
 package rmnp
 
-import "fmt"
-
 type congestionMode uint8
 
 const (

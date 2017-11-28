@@ -4,21 +4,29 @@
 
 package rmnp
 
-import (
-	"net"
-	"fmt"
-)
+import "net"
 
 type Client struct {
 	protocolImpl
-	server *Connection
 
-	ServerConnect    ConnectionCallback
+	// Server is the Connection to the server (nil if not connected).
+	Server *Connection
+
+	// ServerConnect is called when a connection to the server was established.
+	ServerConnect ConnectionCallback
+
+	// ServerDisconnect is called when the server disconnected the client.
 	ServerDisconnect ConnectionCallback
-	ServerTimeout    ConnectionCallback
-	PacketHandler    PacketCallback
+
+	// ServerTimeout is called when the connection to the server timed out.
+	ServerTimeout ConnectionCallback
+
+	// PacketHandler is called when packets arrive to handle the received data.
+	PacketHandler PacketCallback
 }
 
+// NewClient creates and returns a new Client instance that will try to connect
+// to the given server address. It does not connect automatically.
 func NewClient(server string) *Client {
 	c := new(Client)
 
@@ -29,7 +37,7 @@ func NewClient(server string) *Client {
 			return 0, nil, false
 		}
 
-		return length, c.server.Addr, true
+		return length, c.Server.Addr, true
 	}
 
 	c.writeFunc = func(c *Connection, buffer []byte) {
@@ -70,29 +78,19 @@ func NewClient(server string) *Client {
 	return c
 }
 
+// Connect tries to connect to the server specified in the NewClient call. This call is async.
+// On successful connection the Client.ServerConnect callback is invoked.
+// If no connection can be established after CfgTimeoutThreshold milliseconds
+// Client.ServerTimeout is called.
 func (c *Client) Connect() {
 	c.setSocket(net.DialUDP("udp", nil, c.address))
 	c.listen()
-	c.server = c.connectClient(c.socket.RemoteAddr().(*net.UDPAddr))
+	c.Server = c.connectClient(c.socket.RemoteAddr().(*net.UDPAddr))
 }
 
+// Disconnect immediately disconnects from the server. It invokes no callbacks.
+// This call could take some time because it waits for goroutines to exit.
 func (c *Client) Disconnect() {
 	c.destroy()
-	c.server = nil
-}
-
-func (c *Client) SendUnreliable(data []byte) {
-	c.server.SendUnreliable(data)
-}
-
-func (c *Client) SendUnreliableOrdered(data []byte) {
-	c.server.SendUnreliableOrdered(data)
-}
-
-func (c *Client) SendReliable(data []byte) {
-	c.server.SendReliable(data)
-}
-
-func (c *Client) SendReliableOrdered(data []byte) {
-	c.server.SendReliableOrdered(data)
+	c.Server = nil
 }
