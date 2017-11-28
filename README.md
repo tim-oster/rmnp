@@ -1,7 +1,7 @@
 # RMNP - Realtime Multiplayer Networking Protocol
 
 RMNP aims to combine all the advantages of TCP and the speed of UDP in order to be fast enough to support
-modern realtime games like first person shooters. It is basically a extension for UDP.
+modern realtime games like first person shooters. It is basically an extension for UDP.
 
 ## Features
 
@@ -85,4 +85,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) f
 ## Acknowledgments
 
 - Thanks to [@gafferongames](https://github.com/gafferongames) whose [articles](https://gafferongames.com/tags/networking)
-where a huge help for this project
+were a huge help for this project
