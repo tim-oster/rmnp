@@ -276,15 +276,12 @@ func (c *Connection) handleReliablePacket(packet *packet) bool {
 		return false
 	}
 
-	// sendUpdate receive states
 	c.receiveBuffer.set(packet.sequence, true)
 
-	// sendUpdate remote sequences number
 	if greaterThanSequence(packet.sequence, c.remoteSequence) && differenceSequence(packet.sequence, c.remoteSequence) <= CfgMaxSkippedPackets {
 		c.remoteSequence = packet.sequence
 	}
 
-	// sendUpdate ack bit mask for last 32 packets
 	c.ackBits = 0
 	for i := sequenceNumber(1); i <= 32; i++ {
 		if c.receiveBuffer.get(c.remoteSequence - i) {
