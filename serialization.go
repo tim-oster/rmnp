@@ -22,11 +22,11 @@ func NewSerializerFor(buffer []byte) *Serializer {
 }
 
 func (s *Serializer) Read(data interface{}) error {
-	return binary.Read(s.buffer, binary.BigEndian, data)
+	return binary.Read(s.buffer, binary.LittleEndian, data)
 }
 
 func (s *Serializer) Write(data interface{}) error {
-	return binary.Write(s.buffer, binary.BigEndian, data)
+	return binary.Write(s.buffer, binary.LittleEndian, data)
 }
 
 func (s *Serializer) Bytes() []byte {

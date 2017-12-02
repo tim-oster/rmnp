@@ -14,12 +14,10 @@ type orderNumber uint8
 type descriptor byte
 
 const (
-	// Send Flags
 	descReliable descriptor = 1 << iota
 	descAck
 	descOrdered
 
-	// Basic Packet Types (only single use possible)
 	descConnect
 	descDisconnect
 )
@@ -132,7 +130,7 @@ func validateHeader(packet []byte) bool {
 		return false
 	}
 
-	hash1 := binary.BigEndian.Uint32(packet[1:5])
+	hash1 := binary.LittleEndian.Uint32(packet[1:5])
 	hash2 := crc32.ChecksumIEEE(append([]byte{packet[0], 0, 0, 0, 0}, packet[5:]...))
 	return hash1 == hash2
 }

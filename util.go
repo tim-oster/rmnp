@@ -41,7 +41,7 @@ func addrHash(addr *net.UDPAddr) uint32 {
 
 func cnvUint32(i uint32) []byte {
 	b := make([]byte, 4)
-	binary.BigEndian.PutUint32(b, i)
+	binary.LittleEndian.PutUint32(b, i)
 	return b
 }
 
