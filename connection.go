@@ -10,7 +10,6 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"fmt"
 )
 
 type connectionState uint8
@@ -111,12 +110,13 @@ func (c *Connection) reset() {
 	c.lastChainTime = 0
 	c.pingPacketInterval = 0
 
+clear:
 	for {
 		select {
 		case <-c.sendQueue:
 		case <-c.receiveQueue:
 		default:
-			break
+			break clear
 		}
 	}
 

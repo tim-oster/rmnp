@@ -30,7 +30,6 @@ func (chain *chain) reset() {
 	chain.next = 0
 	chain.start = nil
 	chain.length = 0
-	chain.maxLength = 0
 }
 
 func (chain *chain) chain(packet *packet) {
