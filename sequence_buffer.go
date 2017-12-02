@@ -35,10 +35,6 @@ func (buffer *sequenceBuffer) get(sequence sequenceNumber) bool {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
 
-	if sequence < 0 {
-		sequence += buffer.size
-	}
-
 	if buffer.sequences[sequence%buffer.size] != sequence {
 		return false
 	}
@@ -49,10 +45,6 @@ func (buffer *sequenceBuffer) get(sequence sequenceNumber) bool {
 func (buffer *sequenceBuffer) set(sequence sequenceNumber, value bool) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
-
-	if sequence < 0 {
-		sequence += buffer.size
-	}
 
 	buffer.sequences[sequence%buffer.size] = sequence
 	buffer.states[sequence%buffer.size] = value

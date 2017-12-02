@@ -56,7 +56,7 @@ type protocolImpl struct {
 	connectionPool sync.Pool
 
 	// callbacks
-	// for clients: only executed if client is still connected. if client disconnects callback will not be executed
+	// for clients: only executed if client is still connected. if client disconnects callback will not be executed.
 	onConnect    ConnectionCallback
 	onDisconnect ConnectionCallback
 	onTimeout    ConnectionCallback

@@ -10,6 +10,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"fmt"
 )
 
 type connectionState uint8
@@ -24,9 +25,7 @@ type Connection struct {
 	protocol *protocolImpl
 	state    connectionState
 
-	// Conn is the UDPConn to the this connection.
 	Conn *net.UDPConn
-	// Addr is the UDPAddr of this UDPConn.
 	Addr *net.UDPAddr
 
 	// for go routines
@@ -223,7 +222,7 @@ func (c *Connection) keepAlive() {
 		select {
 		case <-c.ctx.Done():
 			return
-		case <-time.After(CfgTimeoutThreshold * time.Millisecond / 2):
+		case <-time.After(CfgTimeoutThreshold * (time.Millisecond / 2)):
 		}
 
 		if c.state == stateDisconnected {
@@ -248,10 +247,6 @@ func (c *Connection) processReceive(buffer []byte) {
 
 	p := new(packet)
 
-	if size := headerSize(buffer); len(buffer)-size > 0 {
-		p.data = buffer[size:]
-	}
-
 	if !p.deserialize(buffer) {
 		return
 	}
@@ -275,6 +270,8 @@ func (c *Connection) handleReliablePacket(packet *packet) bool {
 	if c.receiveBuffer.get(packet.sequence) {
 		return false
 	}
+
+	fmt.Println("received #", packet.sequence)
 
 	c.receiveBuffer.set(packet.sequence, true)
 
@@ -314,6 +311,7 @@ func (c *Connection) handleAckPacket(packet *packet) bool {
 			s := packet.ack - i
 
 			if packet, found := c.sendBuffer.retrieve(s); found {
+				fmt.Println("acked #", packet.packet.sequence)
 				if !packet.noRTT {
 					c.congestionHandler.check(packet.sendTime)
 				}
@@ -359,6 +357,14 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 		} else if packet.flag(descOrdered) {
 			packet.sequence = c.localUnreliableSequence
 			c.localUnreliableSequence++
+		}
+	}
+
+	if packet.flag(descReliable) {
+		if resend {
+			fmt.Println("sending #", packet.sequence, "resend")
+		} else {
+			fmt.Println("sending #", packet.sequence)
 		}
 	}
 
