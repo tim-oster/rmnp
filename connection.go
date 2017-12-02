@@ -271,8 +271,6 @@ func (c *Connection) handleReliablePacket(packet *packet) bool {
 		return false
 	}
 
-	fmt.Println("received #", packet.sequence)
-
 	c.receiveBuffer.set(packet.sequence, true)
 
 	if greaterThanSequence(packet.sequence, c.remoteSequence) && differenceSequence(packet.sequence, c.remoteSequence) <= CfgMaxSkippedPackets {
@@ -311,7 +309,6 @@ func (c *Connection) handleAckPacket(packet *packet) bool {
 			s := packet.ack - i
 
 			if packet, found := c.sendBuffer.retrieve(s); found {
-				fmt.Println("acked #", packet.packet.sequence)
 				if !packet.noRTT {
 					c.congestionHandler.check(packet.sendTime)
 				}
@@ -357,14 +354,6 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 		} else if packet.flag(descOrdered) {
 			packet.sequence = c.localUnreliableSequence
 			c.localUnreliableSequence++
-		}
-	}
-
-	if packet.flag(descReliable) {
-		if resend {
-			fmt.Println("sending #", packet.sequence, "resend")
-		} else {
-			fmt.Println("sending #", packet.sequence)
 		}
 	}
 
