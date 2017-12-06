@@ -44,35 +44,35 @@ func NewServer(address string) *Server {
 		c.Conn.WriteToUDP(buffer, c.Addr)
 	}
 
-	s.onConnect = func(connection *Connection) {
+	s.onConnect = func(connection *Connection, packet []byte) {
 		if s.ClientConnect != nil {
-			s.ClientConnect(connection)
+			s.ClientConnect(connection, packet)
 		}
 	}
 
-	s.onDisconnect = func(connection *Connection) {
+	s.onDisconnect = func(connection *Connection, packet []byte) {
 		if s.ClientDisconnect != nil {
-			s.ClientDisconnect(connection)
+			s.ClientDisconnect(connection, packet)
 		}
 	}
 
-	s.onTimeout = func(connection *Connection) {
+	s.onTimeout = func(connection *Connection, packet []byte) {
 		if s.ClientTimeout != nil {
-			s.ClientTimeout(connection)
+			s.ClientTimeout(connection, packet)
 		}
 	}
 
-	s.onValidation = func(connection *Connection, addr *net.UDPAddr, packet []byte) bool {
+	s.onValidation = func(addr *net.UDPAddr, packet []byte) bool {
 		if s.ClientValidation != nil {
-			return s.ClientValidation(connection, addr, packet)
+			return s.ClientValidation(addr, packet)
 		}
 
 		return true
 	}
 
-	s.onPacket = func(connection *Connection, packet []byte) {
+	s.onPacket = func(connection *Connection, packet []byte, channel Channel) {
 		if s.PacketHandler != nil {
-			s.PacketHandler(connection, packet)
+			s.PacketHandler(connection, packet, channel)
 		}
 	}
 

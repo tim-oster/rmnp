@@ -12,27 +12,27 @@ import (
 	"sync/atomic"
 )
 
-type ConnectionCallback func(*Connection)
-type ValidationCallback func(*Connection, *net.UDPAddr, []byte) bool
-type PacketCallback func(*Connection, []byte)
+type ConnectionCallback func(*Connection, []byte)
+type ValidationCallback func(*net.UDPAddr, []byte) bool
+type PacketCallback func(*Connection, []byte, Channel)
 
-func invokeConnectionCallback(callback ConnectionCallback, connection *Connection) {
+func invokeConnectionCallback(callback ConnectionCallback, connection *Connection, packet []byte) {
 	if callback != nil {
-		callback(connection)
+		callback(connection, packet)
 	}
 }
 
-func invokeValidationCallback(callback ValidationCallback, connection *Connection, addr *net.UDPAddr, packet []byte) bool {
+func invokeValidationCallback(callback ValidationCallback, addr *net.UDPAddr, packet []byte) bool {
 	if callback != nil {
-		return callback(connection, addr, packet)
+		return callback(addr, packet)
 	}
 
 	return true
 }
 
-func invokePacketCallback(callback PacketCallback, connection *Connection, packet []byte) {
+func invokePacketCallback(callback PacketCallback, connection *Connection, packet []byte, channel Channel) {
 	if callback != nil {
-		callback(connection, packet)
+		callback(connection, packet, channel)
 	}
 }
 
@@ -82,9 +82,15 @@ func (impl *protocolImpl) init(address string) {
 
 // is blocking call!
 func (impl *protocolImpl) destroy() {
-	for _, conn := range impl.connections {
-		impl.disconnectClient(conn, true)
+	if impl.address == nil {
+		return
 	}
+
+	impl.connectionsMutex.Lock()
+	for _, conn := range impl.connections {
+		impl.disconnectClient(conn, true, nil)
+	}
+	impl.connectionsMutex.Unlock()
 
 	impl.cancel()
 	impl.waitGroup.Wait()
@@ -170,7 +176,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		}
 
 		header := headerSize(packet)
-		if !invokeValidationCallback(impl.onValidation, nil, addr, packet[header:]) {
+		if !invokeValidationCallback(impl.onValidation, addr, packet[header:]) {
 			atomic.AddUint64(&StatDeniedConnects, 1)
 			return
 		}
@@ -180,12 +186,14 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 
 	// done this way to ensure that connect callback is executed on client-side
 	if connection.state != stateConnected && descriptor(packet[5])&descConnect != 0 {
-		invokeConnectionCallback(impl.onConnect, connection)
+		header := headerSize(packet)
+		invokeConnectionCallback(impl.onConnect, connection, packet[header:])
 		connection.state = stateConnected
 	}
 
 	if descriptor(packet[5])&descDisconnect != 0 {
-		impl.disconnectClient(connection, false)
+		header := headerSize(packet)
+		impl.disconnectClient(connection, false, packet[header:])
 		return
 	}
 
@@ -211,7 +219,7 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	return connection
 }
 
-func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool) {
+func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool, packet []byte) {
 	if connection.state == stateDisconnected {
 		return
 	}
@@ -222,7 +230,7 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 
 	// send more than necessary so that the packet hopefully arrives
 	for i := 0; i < 10; i++ {
-		connection.sendLowLevelPacket(descDisconnect)
+		connection.sendHighLevelPacket(descDisconnect, packet)
 	}
 
 	// give the channel some time to process the packets
@@ -238,7 +246,7 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	impl.connectionsMutex.Unlock()
 
 	if !shutdown {
-		invokeConnectionCallback(impl.onDisconnect, connection)
+		invokeConnectionCallback(impl.onDisconnect, connection, packet)
 	}
 
 	connection.reset()
@@ -247,6 +255,6 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 
 func (impl *protocolImpl) timeoutClient(connection *Connection) {
 	atomic.AddUint64(&StatTimeouts, 1)
-	invokeConnectionCallback(impl.onTimeout, connection)
-	impl.disconnectClient(connection, false)
+	invokeConnectionCallback(impl.onTimeout, connection, nil)
+	impl.disconnectClient(connection, false, nil)
 }

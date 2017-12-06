@@ -20,6 +20,15 @@ const (
 	stateConnected
 )
 
+type Channel byte
+
+const (
+	ChannelUnreliable        Channel = iota
+	ChannelUnreliableOrdered
+	ChannelReliable
+	ChannelReliableOrdered
+)
+
 type Connection struct {
 	protocol *protocolImpl
 	state    connectionState
@@ -56,7 +65,7 @@ type Connection struct {
 	waitGroup    sync.WaitGroup
 
 	// Values allow to store custom data for fast and easy packet handling.
-	Values map[string]interface{}
+	Values map[byte]interface{}
 }
 
 func newConnection() *Connection {
@@ -68,7 +77,7 @@ func newConnection() *Connection {
 		congestionHandler: newCongestionHandler(),
 		sendQueue:         make(chan *packet, CfgMaxSendReceiveQueueSize),
 		receiveQueue:      make(chan []byte, CfgMaxSendReceiveQueueSize),
-		Values:            make(map[string]interface{}),
+		Values:            make(map[byte]interface{}),
 	}
 }
 
@@ -120,7 +129,7 @@ clear:
 		}
 	}
 
-	c.Values = make(map[string]interface{})
+	c.Values = make(map[byte]interface{})
 }
 
 func (c *Connection) startRoutines() {
@@ -263,7 +272,23 @@ func (c *Connection) processReceive(buffer []byte) {
 		return
 	}
 
-	c.process(p)
+	var ch Channel
+
+	if p.flag(descReliable) {
+		if p.flag(descOrdered) {
+			ch = ChannelReliableOrdered
+		} else {
+			ch = ChannelReliable
+		}
+	} else {
+		if p.flag(descOrdered) {
+			ch = ChannelUnreliableOrdered
+		} else {
+			ch = ChannelUnreliable
+		}
+	}
+
+	c.process(p, ch)
 }
 
 func (c *Connection) handleReliablePacket(packet *packet) bool {
@@ -319,9 +344,9 @@ func (c *Connection) handleAckPacket(packet *packet) bool {
 	return true
 }
 
-func (c *Connection) process(packet *packet) {
+func (c *Connection) process(packet *packet, channel Channel) {
 	if packet.data != nil && len(packet.data) > 0 {
-		invokePacketCallback(c.protocol.onPacket, c, packet.data)
+		invokePacketCallback(c.protocol.onPacket, c, packet.data, channel)
 	}
 }
 
@@ -329,7 +354,7 @@ func (c *Connection) handleNextChainSequence() {
 	c.lastChainTime = currentTime()
 
 	for l := c.orderedChain.popConsecutive(); l != nil; l = l.next {
-		c.process(l.packet)
+		c.process(l.packet, ChannelReliableOrdered)
 	}
 }
 
@@ -410,6 +435,21 @@ func (c *Connection) SendReliable(data []byte) {
 // This method is not 100% reliable. (Read more in README)
 func (c *Connection) SendReliableOrdered(data []byte) {
 	c.sendHighLevelPacket(descReliable|descAck|descOrdered, data)
+}
+
+// SendOnChannel sends the data on the given channel using the dedicated send method
+// for each channel
+func (c *Connection) SendOnChannel(channel Channel, data []byte) {
+	switch channel {
+	case ChannelUnreliable:
+		c.SendUnreliable(data)
+	case ChannelUnreliableOrdered:
+		c.SendUnreliableOrdered(data)
+	case ChannelReliable:
+		c.SendReliable(data)
+	case ChannelReliableOrdered:
+		c.SendReliableOrdered(data)
+	}
 }
 
 // GetPing returns the current ping to this connection's socket

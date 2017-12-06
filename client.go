@@ -44,33 +44,33 @@ func NewClient(server string) *Client {
 		c.Conn.Write(buffer)
 	}
 
-	c.onConnect = func(connection *Connection) {
+	c.onConnect = func(connection *Connection, packet []byte) {
 		if c.ServerConnect != nil {
-			c.ServerConnect(connection)
+			c.ServerConnect(connection, packet)
 		}
 	}
 
-	c.onDisconnect = func(connection *Connection) {
+	c.onDisconnect = func(connection *Connection, packet []byte) {
 		if c.ServerDisconnect != nil {
-			c.ServerDisconnect(connection)
+			c.ServerDisconnect(connection, packet)
 		}
 
 		c.destroy()
 	}
 
-	c.onTimeout = func(connection *Connection) {
+	c.onTimeout = func(connection *Connection, packet []byte) {
 		if c.ServerTimeout != nil {
-			c.ServerTimeout(connection)
+			c.ServerTimeout(connection, packet)
 		}
 	}
 
-	c.onValidation = func(connection *Connection, addr *net.UDPAddr, packet []byte) bool {
+	c.onValidation = func(addr *net.UDPAddr, packet []byte) bool {
 		return false
 	}
 
-	c.onPacket = func(connection *Connection, packet []byte) {
+	c.onPacket = func(connection *Connection, packet []byte, channel Channel) {
 		if c.PacketHandler != nil {
-			c.PacketHandler(connection, packet)
+			c.PacketHandler(connection, packet, channel)
 		}
 	}
 
