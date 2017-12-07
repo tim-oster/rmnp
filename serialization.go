@@ -25,6 +25,12 @@ func (s *Serializer) Read(data interface{}) error {
 	return binary.Read(s.buffer, binary.LittleEndian, data)
 }
 
+func (s *Serializer) ReadPanic(data interface{}) {
+	if s.Read(data) != nil {
+		panic(0)
+	}
+}
+
 func (s *Serializer) Write(data interface{}) error {
 	return binary.Write(s.buffer, binary.LittleEndian, data)
 }
