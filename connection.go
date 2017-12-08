@@ -456,3 +456,8 @@ func (c *Connection) SendOnChannel(channel Channel, data []byte) {
 func (c *Connection) GetPing() int16 {
 	return int16(c.congestionHandler.rtt / 2)
 }
+
+// Disconnect disconnects the connection
+func (c *Connection) Disconnect(packet []byte) {
+	go c.protocol.disconnectClient(c, false, packet)
+}
