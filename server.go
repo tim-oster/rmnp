@@ -40,8 +40,8 @@ func NewServer(address string) *Server {
 		return length, addr, true
 	}
 
-	s.writeFunc = func(c *Connection, buffer []byte) {
-		c.Conn.WriteToUDP(buffer, c.Addr)
+	s.writeFunc = func(conn *net.UDPConn, addr *net.UDPAddr, buffer []byte) {
+		conn.WriteToUDP(buffer, addr)
 	}
 
 	s.onConnect = func(connection *Connection, packet []byte) {

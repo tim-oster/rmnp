@@ -390,7 +390,7 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 
 	packet.calculateHash()
 	buffer := packet.serialize()
-	c.protocol.writeFunc(c, buffer)
+	c.protocol.writeFunc(c.Conn, c.Addr, buffer)
 	atomic.AddUint64(&StatSendBytes, uint64(len(buffer)))
 }
 

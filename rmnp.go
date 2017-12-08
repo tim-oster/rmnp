@@ -37,7 +37,7 @@ func invokePacketCallback(callback PacketCallback, connection *Connection, packe
 }
 
 type ReadFunc func(*net.UDPConn, []byte) (int, *net.UDPAddr, bool)
-type WriteFunc func(*Connection, []byte)
+type WriteFunc func(*net.UDPConn, *net.UDPAddr, []byte)
 
 type protocolImpl struct {
 	address *net.UDPAddr

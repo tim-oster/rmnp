@@ -40,8 +40,8 @@ func NewClient(server string) *Client {
 		return length, c.Server.Addr, true
 	}
 
-	c.writeFunc = func(c *Connection, buffer []byte) {
-		c.Conn.Write(buffer)
+	c.writeFunc = func(conn *net.UDPConn, addr *net.UDPAddr, buffer []byte) {
+		conn.Write(buffer)
 	}
 
 	c.onConnect = func(connection *Connection, packet []byte) {
