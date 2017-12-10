@@ -241,11 +241,11 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 
 	hash := addrHash(connection.Addr)
 
-	impl.connectionsMutex.Lock()
-	delete(impl.connections, hash)
-	impl.connectionsMutex.Unlock()
-
 	if !shutdown {
+		impl.connectionsMutex.Lock()
+		delete(impl.connections, hash)
+		impl.connectionsMutex.Unlock()
+		
 		invokeConnectionCallback(impl.onDisconnect, connection, packet)
 	}
 
