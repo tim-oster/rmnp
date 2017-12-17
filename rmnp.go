@@ -240,11 +240,13 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	connection.waitGroup.Wait()
 
 	if !shutdown {
-		hash := addrHash(connection.Addr)
+		if connection.Addr != nil {
+			hash := addrHash(connection.Addr)
 
-		impl.connectionsMutex.Lock()
-		delete(impl.connections, hash)
-		impl.connectionsMutex.Unlock()
+			impl.connectionsMutex.Lock()
+			delete(impl.connections, hash)
+			impl.connectionsMutex.Unlock()
+		}
 
 		invokeConnectionCallback(impl.onDisconnect, connection, packet)
 	}
