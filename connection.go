@@ -134,6 +134,7 @@ clear:
 }
 
 func (c *Connection) startRoutines() {
+	fmt.Println("starting routines")
 	c.ctx, c.stopRoutines = context.WithCancel(context.Background())
 	go c.sendUpdate()
 	go c.receiveUpdate()
@@ -228,11 +229,13 @@ func (c *Connection) keepAlive() {
 	atomic.AddUint64(&StatRunningGoRoutines, 1)
 	defer atomic.AddUint64(&StatRunningGoRoutines, ^uint64(0))
 
+	fmt.Println("started keepAlive")
+
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
-		case <-time.After(CfgTimeoutThreshold * (time.Millisecond / 2)):
+		case <-time.After((CfgTimeoutThreshold / 2) * time.Millisecond):
 		}
 
 		if c.state == stateDisconnected {
