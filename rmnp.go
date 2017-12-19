@@ -10,6 +10,7 @@ import (
 	"time"
 	"sync"
 	"sync/atomic"
+	"fmt"
 )
 
 type ConnectionCallback func(*Connection, []byte)
@@ -147,6 +148,8 @@ func (impl *protocolImpl) listeningWorker() {
 			if !next {
 				return
 			}
+
+			fmt.Println("received")
 
 			sizedBuffer := buffer[:length]
 
