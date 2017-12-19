@@ -10,6 +10,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"fmt"
 )
 
 type connectionState uint8
@@ -235,10 +236,13 @@ func (c *Connection) keepAlive() {
 		}
 
 		if c.state == stateDisconnected {
+			fmt.Println("state = disconnected")
 			continue
 		}
 
 		currentTime := currentTime()
+		fmt.Println("currentTime:", currentTime)
+		fmt.Println("difference:", currentTime-c.lastReceivedTime, ">", int64(CfgTimeoutThreshold))
 
 		if currentTime-c.lastReceivedTime > int64(CfgTimeoutThreshold) || c.GetPing() > CfgMaxPing {
 			// needs to be executed in goroutine; otherwise this method could not exit and therefore deadlock
