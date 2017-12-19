@@ -221,6 +221,10 @@ func (c *Connection) receiveUpdate() {
 }
 
 func (c *Connection) keepAlive() {
+	defer func() {
+		fmt.Println("finished keepAlive")
+	}()
+
 	defer antiPanic(c.keepAlive)
 
 	c.waitGroup.Add(1)
