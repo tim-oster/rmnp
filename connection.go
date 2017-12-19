@@ -64,8 +64,8 @@ type Connection struct {
 	receiveQueue chan []byte
 	waitGroup    sync.WaitGroup
 
-	// Values allow to store custom data for fast and easy packet handling.
-	Values map[byte]interface{}
+	values      map[byte]interface{}
+	valuesMutex sync.RWMutex
 }
 
 func newConnection() *Connection {
@@ -77,7 +77,7 @@ func newConnection() *Connection {
 		congestionHandler: newCongestionHandler(),
 		sendQueue:         make(chan *packet, CfgMaxSendReceiveQueueSize),
 		receiveQueue:      make(chan []byte, CfgMaxSendReceiveQueueSize),
-		Values:            make(map[byte]interface{}),
+		values:            make(map[byte]interface{}),
 	}
 }
 
@@ -129,7 +129,7 @@ clear:
 		}
 	}
 
-	c.Values = make(map[byte]interface{})
+	c.values = make(map[byte]interface{})
 }
 
 func (c *Connection) startRoutines() {
@@ -460,4 +460,37 @@ func (c *Connection) GetPing() int16 {
 // Disconnect disconnects the connection
 func (c *Connection) Disconnect(packet []byte) {
 	go c.protocol.disconnectClient(c, false, packet)
+}
+
+// Set stores a value associated with the given key in this connection instance.
+// It is thread safe.
+func (c *Connection) Set(key byte, value interface{}) {
+	c.valuesMutex.Lock()
+	defer c.valuesMutex.Unlock()
+	c.values[key] = value
+}
+
+// Get retrieves a stored value from this connection instance and returns if it exists.
+// It is thread safe.
+func (c *Connection) Get(key byte) (interface{}, bool) {
+	c.valuesMutex.RLock()
+	defer c.valuesMutex.RUnlock()
+	v, f := c.values[key]
+	return v, f
+}
+
+// Get retrieves a stored value from this connection instance.
+// It is thread safe.
+func (c *Connection) GetUnsafe(key byte) interface{} {
+	c.valuesMutex.RLock()
+	defer c.valuesMutex.RUnlock()
+	return c.values[key]
+}
+
+// Del deletes a stored value from this connection instance.
+// It is thread safe.
+func (c *Connection) Del(key byte) {
+	c.valuesMutex.RLock()
+	defer c.valuesMutex.RUnlock()
+	delete(c.values, key)
 }
