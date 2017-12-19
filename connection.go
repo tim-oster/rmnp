@@ -10,7 +10,6 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"fmt"
 )
 
 type connectionState uint8
@@ -134,7 +133,6 @@ clear:
 }
 
 func (c *Connection) startRoutines() {
-	fmt.Println("starting routines")
 	c.ctx, c.stopRoutines = context.WithCancel(context.Background())
 	go c.sendUpdate()
 	go c.receiveUpdate()
@@ -221,10 +219,6 @@ func (c *Connection) receiveUpdate() {
 }
 
 func (c *Connection) keepAlive() {
-	defer func() {
-		fmt.Println("finished keepAlive")
-	}()
-
 	defer antiPanic(c.keepAlive)
 
 	c.waitGroup.Add(1)
@@ -232,8 +226,6 @@ func (c *Connection) keepAlive() {
 
 	atomic.AddUint64(&StatRunningGoRoutines, 1)
 	defer atomic.AddUint64(&StatRunningGoRoutines, ^uint64(0))
-
-	fmt.Println("started keepAlive")
 
 	for {
 		select {
@@ -243,13 +235,10 @@ func (c *Connection) keepAlive() {
 		}
 
 		if c.state == stateDisconnected {
-			fmt.Println("state = disconnected")
 			continue
 		}
 
 		currentTime := currentTime()
-		fmt.Println("currentTime:", currentTime)
-		fmt.Println("difference:", currentTime-c.lastReceivedTime, ">", int64(CfgTimeoutThreshold))
 
 		if currentTime-c.lastReceivedTime > int64(CfgTimeoutThreshold) || c.GetPing() > CfgMaxPing {
 			// needs to be executed in goroutine; otherwise this method could not exit and therefore deadlock
