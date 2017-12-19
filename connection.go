@@ -470,6 +470,20 @@ func (c *Connection) Set(key byte, value interface{}) {
 	c.values[key] = value
 }
 
+// TrySet stores a value associated with the given key in this connection instance if does not exist yet.
+// It returns whether is was able to set the value. It is thread safe.
+func (c *Connection) TrySet(key byte, value interface{}) bool {
+	c.valuesMutex.Lock()
+	defer c.valuesMutex.Unlock()
+
+	if _, f := c.values[key]; !f {
+		c.values[key] = value
+		return true
+	}
+
+	return false
+}
+
 // Get retrieves a stored value from this connection instance and returns if it exists.
 // It is thread safe.
 func (c *Connection) Get(key byte) (interface{}, bool) {
