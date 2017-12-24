@@ -55,7 +55,7 @@ func NewClient(server string) *Client {
 			c.ServerDisconnect(connection, packet)
 		}
 
-		c.destroy()
+		go c.destroy()
 	}
 
 	c.onTimeout = func(connection *Connection, packet []byte) {
