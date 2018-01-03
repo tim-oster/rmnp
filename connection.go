@@ -10,6 +10,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"fmt"
 )
 
 type connectionState uint8
@@ -395,6 +396,7 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 }
 
 func (c *Connection) sendPacket(packet *packet) {
+	fmt.Println("sendPacket: sendQuere (len/cap) =", len(c.sendQueue), "/", cap(c.sendQueue))
 	c.sendQueue <- packet
 }
 
