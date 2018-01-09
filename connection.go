@@ -399,7 +399,7 @@ func (c *Connection) sendPacket(packet *packet) {
 	if len(c.sendQueue) >= cap(c.sendQueue)-10 {
 		fmt.Println(">>>>>>>> sendQueue close to reach cap")
 	}
-	
+
 	c.sendQueue <- packet
 }
 
