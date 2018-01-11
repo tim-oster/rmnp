@@ -404,7 +404,10 @@ func (c *Connection) sendPacket(packet *packet) {
 			select {
 			case p := <-c.sendQueue:
 				if p.data != nil {
+					fmt.Printf("%b ", p.descriptor)
 					fmt.Println(p.data)
+				} else {
+					fmt.Printf("%b\n", p.descriptor)
 				}
 			default:
 				break loop
