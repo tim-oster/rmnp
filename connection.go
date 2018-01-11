@@ -396,8 +396,20 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 }
 
 func (c *Connection) sendPacket(packet *packet) {
-	if len(c.sendQueue) >= cap(c.sendQueue)-10 {
+	if len(c.sendQueue) >= cap(c.sendQueue)-30 {
 		fmt.Println(">>>>>>>> sendQueue close to reach cap")
+
+	loop:
+		for {
+			select {
+			case p := <-c.sendQueue:
+				if p.data != nil {
+					fmt.Println(p.data)
+				}
+			default:
+				break loop
+			}
+		}
 	}
 
 	c.sendQueue <- packet
