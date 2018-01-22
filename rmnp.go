@@ -40,6 +40,14 @@ func invokePacketCallback(callback PacketCallback, connection *Connection, packe
 type ReadFunc func(*net.UDPConn, []byte) (int, *net.UDPAddr, bool)
 type WriteFunc func(*net.UDPConn, *net.UDPAddr, []byte)
 
+type disconnectType byte
+
+const (
+	disconnectTypeDefault  disconnectType = iota
+	disconnectTypeShutdown
+	disconnectTypeTimeout
+)
+
 type protocolImpl struct {
 	address *net.UDPAddr
 	socket  *net.UDPConn
@@ -48,6 +56,7 @@ type protocolImpl struct {
 	cancel    context.CancelFunc
 	waitGroup sync.WaitGroup
 
+	connectGuard     *execGuard
 	connectionsMutex sync.RWMutex
 	connections      map[uint32]*Connection
 	readFunc         ReadFunc
@@ -70,6 +79,7 @@ func (impl *protocolImpl) init(address string) {
 	checkError("Failed to resolve udp address", err)
 
 	impl.address = addr
+	impl.connectGuard = newExecGuard()
 	impl.connections = make(map[uint32]*Connection)
 
 	impl.bufferPool = sync.Pool{
@@ -89,7 +99,7 @@ func (impl *protocolImpl) destroy() {
 
 	impl.connectionsMutex.Lock()
 	for _, conn := range impl.connections {
-		impl.disconnectClient(conn, true, nil)
+		impl.disconnectClient(conn, disconnectTypeShutdown, nil)
 	}
 	impl.connectionsMutex.Unlock()
 
@@ -102,6 +112,7 @@ func (impl *protocolImpl) destroy() {
 	impl.ctx = nil
 	impl.cancel = nil
 
+	impl.connectGuard = nil
 	impl.connections = nil
 }
 
@@ -176,6 +187,10 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 			return
 		}
 
+		if !impl.connectGuard.tryExecute(hash) {
+			return
+		}
+
 		header := headerSize(packet)
 		if !invokeValidationCallback(impl.onValidation, addr, packet[header:]) {
 			atomic.AddUint64(&StatDeniedConnects, 1)
@@ -186,15 +201,19 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	}
 
 	// done this way to ensure that connect callback is executed on client-side
-	if connection.state != stateConnected && descriptor(packet[5])&descConnect != 0 {
-		header := headerSize(packet)
-		invokeConnectionCallback(impl.onConnect, connection, packet[header:])
-		connection.state = stateConnected
+	if descriptor(packet[5])&descConnect != 0 {
+		if connection.updateState(stateConnected) {
+			header := headerSize(packet)
+			invokeConnectionCallback(impl.onConnect, connection, packet[header:])
+			impl.connectGuard.finish(hash)
+		} else {
+			return
+		}
 	}
 
 	if descriptor(packet[5])&descDisconnect != 0 {
 		header := headerSize(packet)
-		impl.disconnectClient(connection, false, packet[header:])
+		impl.disconnectClient(connection, disconnectTypeDefault, packet[header:])
 		return
 	}
 
@@ -225,14 +244,17 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	return connection
 }
 
-func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool, packet []byte) {
-	if connection.state == stateDisconnected {
+func (impl *protocolImpl) disconnectClient(connection *Connection, disconnectType disconnectType, packet []byte) {
+	if !connection.updateState(stateDisconnected) {
 		return
 	}
 
-	atomic.AddUint64(&StatDisconnects, 1)
+	if disconnectType == disconnectTypeTimeout {
+		atomic.AddUint64(&StatTimeouts, 1)
+		invokeConnectionCallback(impl.onTimeout, connection, nil)
+	}
 
-	connection.state = stateDisconnected
+	atomic.AddUint64(&StatDisconnects, 1)
 
 	// send more than necessary so that the packet hopefully arrives
 	for i := 0; i < 10; i++ {
@@ -245,7 +267,7 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 	connection.stopRoutines()
 	connection.waitGroup.Wait()
 
-	if !shutdown {
+	if disconnectType != disconnectTypeShutdown {
 		if connection.Addr != nil {
 			hash := addrHash(connection.Addr)
 
@@ -259,10 +281,4 @@ func (impl *protocolImpl) disconnectClient(connection *Connection, shutdown bool
 
 	connection.reset()
 	impl.connectionPool.Put(connection)
-}
-
-func (impl *protocolImpl) timeoutClient(connection *Connection) {
-	atomic.AddUint64(&StatTimeouts, 1)
-	invokeConnectionCallback(impl.onTimeout, connection, nil)
-	impl.disconnectClient(connection, false, nil)
 }

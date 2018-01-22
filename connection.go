@@ -32,7 +32,9 @@ const (
 
 type Connection struct {
 	protocol *protocolImpl
-	state    connectionState
+
+	stateMutex sync.RWMutex
+	state      connectionState
 
 	Conn *net.UDPConn
 	Addr *net.UDPAddr
@@ -178,7 +180,7 @@ func (c *Connection) sendUpdate() {
 			})
 		}
 
-		if c.state != stateConnected {
+		if c.getState() != stateConnected {
 			continue
 		}
 
@@ -235,7 +237,7 @@ func (c *Connection) keepAlive() {
 		case <-time.After((CfgTimeoutThreshold / 2) * time.Millisecond):
 		}
 
-		if c.state == stateDisconnected {
+		if c.getState() == stateDisconnected {
 			continue
 		}
 
@@ -246,7 +248,7 @@ func (c *Connection) keepAlive() {
 			// the connection's waitGroup
 			go func() {
 				defer antiPanic(nil)
-				c.protocol.timeoutClient(c)
+				c.protocol.disconnectClient(c, disconnectTypeTimeout, nil)
 			}()
 		}
 	}
@@ -376,7 +378,7 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 				c.orderedSequence++
 			}
 
-			c.sendBuffer.add(packet, c.state != stateConnected)
+			c.sendBuffer.add(packet, c.getState() != stateConnected)
 		} else if packet.flag(descOrdered) {
 			packet.sequence = c.localUnreliableSequence
 			c.localUnreliableSequence++
@@ -430,6 +432,30 @@ func (c *Connection) sendAckPacket() {
 	c.sendLowLevelPacket(descAck)
 }
 
+func (c *Connection) getState() connectionState {
+	c.stateMutex.RLock()
+	defer c.stateMutex.RUnlock()
+	return c.state
+}
+
+func (c *Connection) setState(state connectionState) {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	c.state = state
+}
+
+func (c *Connection) updateState(state connectionState) bool {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+
+	if c.state != state {
+		c.state = state
+		return true
+	}
+
+	return false
+}
+
 // SendUnreliable sends the data with no guarantee whether it arrives or not.
 // Note that the packets or not guaranteed to arrive in order.
 func (c *Connection) SendUnreliable(data []byte) {
@@ -479,7 +505,7 @@ func (c *Connection) GetPing() int16 {
 
 // Disconnect disconnects the connection
 func (c *Connection) Disconnect(packet []byte) {
-	go c.protocol.disconnectClient(c, false, packet)
+	go c.protocol.disconnectClient(c, disconnectTypeDefault, packet)
 }
 
 // Set stores a value associated with the given key in this connection instance.
