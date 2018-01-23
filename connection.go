@@ -514,10 +514,12 @@ func (c *Connection) Get(key byte) (interface{}, bool) {
 
 // Get retrieves a stored value from this connection instance.
 // It is thread safe.
-func (c *Connection) GetUnsafe(key byte) interface{} {
-	c.valuesMutex.RLock()
-	defer c.valuesMutex.RUnlock()
-	return c.values[key]
+func (c *Connection) GetFallback(key byte, fallback interface{}) interface{} {
+	if v, f := c.Get(key); f {
+		return v
+	} else {
+		return fallback
+	}
 }
 
 // Del deletes a stored value from this connection instance.
