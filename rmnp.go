@@ -10,7 +10,6 @@ import (
 	"time"
 	"sync"
 	"sync/atomic"
-	"fmt"
 )
 
 type ConnectionCallback func(*Connection, []byte)
@@ -218,12 +217,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	}
 
 	atomic.AddUint64(&StatProcessedBytes, uint64(len(packet)))
-
-	if len(connection.receiveQueue) >= cap(connection.receiveQueue)-10 {
-		fmt.Println(">>>>>>>> receiveQueue close to reach cap")
-	}
-
-	connection.receiveQueue <- packet
+	connection.receiveQueue.push(packet)
 }
 
 func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {

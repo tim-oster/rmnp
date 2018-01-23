@@ -10,7 +10,6 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"fmt"
 )
 
 type connectionState uint8
@@ -63,8 +62,8 @@ type Connection struct {
 	receiveBuffer      *sequenceBuffer
 	congestionHandler  *congestionHandler
 
-	sendQueue    chan *packet
-	receiveQueue chan []byte
+	sendQueue    *dropChannel //chan *packet
+	receiveQueue *dropChannel //chan []byte
 	waitGroup    sync.WaitGroup
 
 	values      map[byte]interface{}
@@ -78,8 +77,8 @@ func newConnection() *Connection {
 		sendBuffer:        newSendBuffer(),
 		receiveBuffer:     newSequenceBuffer(CfgSequenceBufferSize),
 		congestionHandler: newCongestionHandler(),
-		sendQueue:         make(chan *packet, CfgMaxSendReceiveQueueSize),
-		receiveQueue:      make(chan []byte, CfgMaxSendReceiveQueueSize),
+		sendQueue:         newDropChannel(make(chan interface{}, CfgMaxSendReceiveQueueSize)),
+		receiveQueue:      newDropChannel(make(chan interface{}, CfgMaxSendReceiveQueueSize)),
 		values:            make(map[byte]interface{}),
 	}
 }
@@ -122,15 +121,8 @@ func (c *Connection) reset() {
 	c.lastChainTime = 0
 	c.pingPacketInterval = 0
 
-clear:
-	for {
-		select {
-		case <-c.sendQueue:
-		case <-c.receiveQueue:
-		default:
-			break clear
-		}
-	}
+	c.sendQueue.clear()
+	c.receiveQueue.clear()
 
 	c.values = make(map[byte]interface{})
 }
@@ -156,8 +148,8 @@ func (c *Connection) sendUpdate() {
 		case <-time.After(CfgUpdateLoopTimeout * time.Millisecond):
 		case <-c.ctx.Done():
 			return
-		case packet := <-c.sendQueue:
-			c.processSend(packet, false)
+		case p := <-c.sendQueue.channel:
+			c.processSend(p.(*packet), false)
 		}
 
 		currentTime := currentTime()
@@ -215,8 +207,8 @@ func (c *Connection) receiveUpdate() {
 		select {
 		case <-c.ctx.Done():
 			return
-		case packet := <-c.receiveQueue:
-			c.processReceive(packet)
+		case p := <-c.receiveQueue.channel:
+			c.processReceive(p.([]byte))
 		}
 	}
 }
@@ -398,26 +390,7 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 }
 
 func (c *Connection) sendPacket(packet *packet) {
-	if len(c.sendQueue) >= cap(c.sendQueue)-30 {
-		fmt.Println(">>>>>>>> sendQueue close to reach cap")
-
-	loop:
-		for {
-			select {
-			case p := <-c.sendQueue:
-				if p.data != nil {
-					fmt.Printf("%b ", p.descriptor)
-					fmt.Println(p.data)
-				} else {
-					fmt.Printf("%b\n", p.descriptor)
-				}
-			default:
-				break loop
-			}
-		}
-	}
-
-	c.sendQueue <- packet
+	c.sendQueue.push(packet)
 }
 
 func (c *Connection) sendLowLevelPacket(descriptor descriptor) {
