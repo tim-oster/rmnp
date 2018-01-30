@@ -77,15 +77,15 @@ var (
 )
 
 var (
-	// CfgBadModeMultiplier is the multiplier for variables in bad mode
+	// CfgBadModeMultiplier is the multiplier for variables in bad mode.
 	CfgBadModeMultiplier float32 = 2.5
 
-	// CfgResendTimeout is the default timeout for packets before resend
+	// CfgResendTimeout is the default timeout for packets before resend.
 	CfgResendTimeout int64 = 50
 
-	// CfgMaxPacketResends is the default max amount of packets to resend during one update
+	// CfgMaxPacketResends is the default max amount of packets to resend during one update.
 	CfgMaxPacketResends int64 = 15
 
-	// CfgReackTimeout is the default timeout before a manual ack packet gets send
+	// CfgReackTimeout is the default timeout before a manual ack packet gets send.
 	CfgReackTimeout int64 = 50
 )
