@@ -5,11 +5,11 @@
 package rmnp
 
 import (
-	"net"
-	"time"
 	"context"
+	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type connectionState uint8
@@ -20,15 +20,21 @@ const (
 	stateConnected
 )
 
+// Channel is the method of sending packets
 type Channel byte
 
 const (
-	ChannelUnreliable        Channel = iota
+	// ChannelUnreliable is fire and forget and unordered
+	ChannelUnreliable Channel = iota
+	// ChannelUnreliableOrdered is fire and forget but sends in order
 	ChannelUnreliableOrdered
+	// ChannelReliable retries lost packets but is unordered
 	ChannelReliable
+	// ChannelReliableOrdered retries lost packets but sends in order
 	ChannelReliableOrdered
 )
 
+// Connection is a udp connection and handles sending of packets
 type Connection struct {
 	protocol *protocolImpl
 
@@ -164,10 +170,9 @@ func (c *Connection) sendUpdate() {
 
 				if currentTime-data.sendTime > CfgSendRemoveTimeout {
 					return sendBufferDelete
-				} else {
-					c.processSend(data.packet, true)
 				}
 
+				c.processSend(data.packet, true)
 				return sendBufferContinue
 			})
 		}
@@ -358,7 +363,7 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 		return
 	}
 
-	packet.protocolId = CfgProtocolId
+	packet.protocolID = CfgProtocolID
 
 	if !resend {
 		if packet.flag(descReliable) {
@@ -512,14 +517,13 @@ func (c *Connection) Get(key byte) (interface{}, bool) {
 	return v, f
 }
 
-// Get retrieves a stored value from this connection instance.
+// GetFallback retrieves a stored value from this connection instance.
 // It is thread safe.
 func (c *Connection) GetFallback(key byte, fallback interface{}) interface{} {
 	if v, f := c.Get(key); f {
 		return v
-	} else {
-		return fallback
 	}
+	return fallback
 }
 
 // Del deletes a stored value from this connection instance.

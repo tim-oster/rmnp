@@ -6,11 +6,11 @@ package rmnp
 
 import (
 	"encoding/binary"
-	"time"
 	"fmt"
-	"net"
 	"hash/crc32"
+	"net"
 	"sync/atomic"
+	"time"
 )
 
 func checkError(msg string, err error) {
@@ -61,12 +61,10 @@ func differenceSequence(s1, s2 sequenceNumber) sequenceNumber {
 	if s1 >= s2 {
 		if s1-s2 <= 32768 {
 			return s1 - s2
-		} else {
-			return (65535 - s1) + s2
 		}
-	} else {
-		return differenceSequence(s2, s1)
+		return (65535 - s1) + s2
 	}
+	return differenceSequence(s2, s1)
 }
 
 func min(x, y int64) int64 {

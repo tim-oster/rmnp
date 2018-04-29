@@ -6,6 +6,7 @@ package rmnp
 
 import "net"
 
+// Server listens for incoming rmnp packets
 type Server struct {
 	protocolImpl
 

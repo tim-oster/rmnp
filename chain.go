@@ -39,7 +39,7 @@ func (chain *chain) chain(packet *packet) {
 	if chain.start == nil {
 		chain.start = &chainLink{next: nil, packet: packet}
 	} else {
-		var link *chainLink = nil
+		var link *chainLink
 
 		for l := chain.start; l != nil; l = l.next {
 			if greaterThanOrder(packet.order, l.packet.order) {
@@ -68,7 +68,7 @@ func (chain *chain) popConsecutive() *chainLink {
 	chain.mutex.Lock()
 	defer chain.mutex.Unlock()
 
-	var last *chainLink = nil
+	var last *chainLink
 
 	for l := chain.start; l != nil; l = l.next {
 		if l.packet.order == chain.next {

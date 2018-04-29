@@ -6,6 +6,7 @@ package rmnp
 
 import "net"
 
+// Client is used to connect to a rmnp server
 type Client struct {
 	protocolImpl
 
