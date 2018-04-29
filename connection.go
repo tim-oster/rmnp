@@ -12,12 +12,16 @@ import (
 	"time"
 )
 
-type connectionState uint8
+// ConnectionState is the current state of the connection
+type ConnectionState uint8
 
 const (
-	stateDisconnected connectionState = iota
-	stateConnecting
-	stateConnected
+	// StateDisconnected is when a disconnection has occured
+	StateDisconnected ConnectionState = iota
+	// StateConnecting is when the connection is in the process of connecting
+	StateConnecting
+	// StateConnected is when the connection is fully connected
+	StateConnected
 )
 
 // Channel is the method of sending packets
@@ -39,7 +43,7 @@ type Connection struct {
 	protocol *protocolImpl
 
 	stateMutex sync.RWMutex
-	state      connectionState
+	state      ConnectionState
 
 	Conn *net.UDPConn
 	Addr *net.UDPAddr
@@ -78,7 +82,7 @@ type Connection struct {
 
 func newConnection() *Connection {
 	return &Connection{
-		state:             stateDisconnected,
+		state:             StateDisconnected,
 		orderedChain:      newChain(CfgMaxPacketChainLength),
 		sendBuffer:        newSendBuffer(),
 		receiveBuffer:     newSequenceBuffer(CfgSequenceBufferSize),
@@ -93,7 +97,7 @@ func (c *Connection) init(impl *protocolImpl, addr *net.UDPAddr) {
 	c.protocol = impl
 	c.Conn = impl.socket
 	c.Addr = addr
-	c.state = stateConnecting
+	c.state = StateConnecting
 
 	t := currentTime()
 	c.lastAckSendTime = t
@@ -103,7 +107,7 @@ func (c *Connection) init(impl *protocolImpl, addr *net.UDPAddr) {
 
 func (c *Connection) reset() {
 	c.protocol = nil
-	c.state = stateDisconnected
+	c.state = StateDisconnected
 
 	c.Conn = nil
 	c.Addr = nil
@@ -177,7 +181,7 @@ func (c *Connection) sendUpdate() {
 			})
 		}
 
-		if c.getState() != stateConnected {
+		if c.GetState() != StateConnected {
 			continue
 		}
 
@@ -234,7 +238,7 @@ func (c *Connection) keepAlive() {
 		case <-time.After((CfgTimeoutThreshold / 2) * time.Millisecond):
 		}
 
-		if c.getState() == stateDisconnected {
+		if c.GetState() == StateDisconnected {
 			continue
 		}
 
@@ -375,7 +379,7 @@ func (c *Connection) processSend(packet *packet, resend bool) {
 				c.orderedSequence++
 			}
 
-			c.sendBuffer.add(packet, c.getState() != stateConnected)
+			c.sendBuffer.add(packet, c.GetState() != StateConnected)
 		} else if packet.flag(descOrdered) {
 			packet.sequence = c.localUnreliableSequence
 			c.localUnreliableSequence++
@@ -410,19 +414,20 @@ func (c *Connection) sendAckPacket() {
 	c.sendLowLevelPacket(descAck)
 }
 
-func (c *Connection) getState() connectionState {
+// GetState returns the ConnectionState of the connection
+func (c *Connection) GetState() ConnectionState {
 	c.stateMutex.RLock()
 	defer c.stateMutex.RUnlock()
 	return c.state
 }
 
-func (c *Connection) setState(state connectionState) {
+func (c *Connection) setState(state ConnectionState) {
 	c.stateMutex.Lock()
 	defer c.stateMutex.Unlock()
 	c.state = state
 }
 
-func (c *Connection) updateState(state connectionState) bool {
+func (c *Connection) updateState(state ConnectionState) bool {
 	c.stateMutex.Lock()
 	defer c.stateMutex.Unlock()
 

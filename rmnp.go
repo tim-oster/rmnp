@@ -209,7 +209,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 
 	// done this way to ensure that connect callback is executed on client-side
 	if descriptor(packet[5])&descConnect != 0 {
-		if connection.updateState(stateConnected) {
+		if connection.updateState(StateConnected) {
 			header := headerSize(packet)
 			invokeConnectionCallback(impl.onConnect, connection, packet[header:])
 			impl.connectGuard.finish(hash)
@@ -247,7 +247,7 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 }
 
 func (impl *protocolImpl) disconnectClient(connection *Connection, disconnectType disconnectType, packet []byte) {
-	if !connection.updateState(stateDisconnected) {
+	if !connection.updateState(StateDisconnected) {
 		return
 	}
 
