@@ -23,7 +23,7 @@ const (
 )
 
 type packet struct {
-	protocolId byte
+	protocolID byte
 	crc32      uint32
 	descriptor descriptor
 
@@ -44,7 +44,7 @@ type packet struct {
 func (p *packet) serialize() []byte {
 	s := NewSerializer()
 
-	s.Write(p.protocolId)
+	s.Write(p.protocolID)
 	s.Write(p.crc32)
 	s.Write(p.descriptor)
 
@@ -72,7 +72,7 @@ func (p *packet) deserialize(packet []byte) bool {
 	s := NewSerializerFor(packet)
 
 	// head is valid (validated before data processing)
-	s.Read(&p.protocolId)
+	s.Read(&p.protocolID)
 	s.Read(&p.crc32)
 	s.Read(&p.descriptor)
 
@@ -122,7 +122,7 @@ func validateHeader(packet []byte) bool {
 		return false
 	}
 
-	if packet[0] != CfgProtocolId {
+	if packet[0] != CfgProtocolID {
 		return false
 	}
 
@@ -149,7 +149,7 @@ func headerSize(packet []byte) int {
 
 	if desc&descReliable != 0 && desc&descOrdered != 0 {
 		// order (1)
-		size += 1
+		size++
 	}
 
 	if desc&descAck != 0 {

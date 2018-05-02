@@ -5,15 +5,20 @@
 package rmnp
 
 import (
-	"net"
 	"context"
-	"time"
+	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
+// ConnectionCallback is the function called when connections change
 type ConnectionCallback func(*Connection, []byte)
+
+// ValidationCallback is the function called to validate a connnection
 type ValidationCallback func(*net.UDPAddr, []byte) bool
+
+// PacketCallback is the function called when a packet is received
 type PacketCallback func(*Connection, []byte, Channel)
 
 func invokeConnectionCallback(callback ConnectionCallback, connection *Connection, packet []byte) {
@@ -36,13 +41,16 @@ func invokePacketCallback(callback PacketCallback, connection *Connection, packe
 	}
 }
 
+// ReadFunc is the function called to write information to a udp connection
 type ReadFunc func(*net.UDPConn, []byte) (int, *net.UDPAddr, bool)
+
+// WriteFunc is the function called to read information from a udp connection
 type WriteFunc func(*net.UDPConn, *net.UDPAddr, []byte)
 
 type disconnectType byte
 
 const (
-	disconnectTypeDefault  disconnectType = iota
+	disconnectTypeDefault disconnectType = iota
 	disconnectTypeShutdown
 	disconnectTypeTimeout
 )

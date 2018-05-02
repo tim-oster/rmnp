@@ -10,8 +10,8 @@ var (
 	// CfgMTU is the maximum byte size of a packet (header included).
 	CfgMTU = 1024
 
-	// CfgProtocolId is the identification number send with every rmnp packet to filter out unwanted traffic.
-	CfgProtocolId byte = 231
+	// CfgProtocolID is the identification number send with every rmnp packet to filter out unwanted traffic.
+	CfgProtocolID byte = 231
 
 	// CfgParallelListenerCount is the amount of goroutines that will be spawned to listen on incoming requests.
 	CfgParallelListenerCount = 4

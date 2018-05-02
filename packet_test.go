@@ -7,11 +7,11 @@ package rmnp
 import "testing"
 
 var testPacketDescriptors = map[descriptor]int{
-	0:                                    6,
-	descReliable:                         8,
-	descOrdered:                          8,
-	descReliable | descOrdered:           9,
-	descAck:                              12,
+	0:                          6,
+	descReliable:               8,
+	descOrdered:                8,
+	descReliable | descOrdered: 9,
+	descAck:                    12,
 	descReliable | descOrdered | descAck: 15,
 }
 
@@ -27,7 +27,7 @@ var testPacketDescriptorPermutations = []descriptor{
 
 func newTestPacket() *packet {
 	return &packet{
-		protocolId: CfgProtocolId,
+		protocolID: CfgProtocolID,
 		crc32:      244,
 		descriptor: descReliable | descAck | descOrdered,
 		sequence:   10,
@@ -45,7 +45,7 @@ func TestPacketSerialization(t *testing.T) {
 	s.data = []byte{0, 1, 2, 3, 4, 5, 6, 7}
 	d.deserialize(s.serialize())
 
-	if d.protocolId != s.protocolId {
+	if d.protocolID != s.protocolID {
 		t.Error("packet.protocolId not correctly serialized")
 	}
 
@@ -122,7 +122,7 @@ func TestPacketValidateHeader(t *testing.T) {
 		t.Error("Wrong min length for fixed header")
 	}
 
-	d[len(d)/2] += 1
+	d[len(d)/2]++
 
 	if validateHeader(d) {
 		t.Error("Hash check not working")

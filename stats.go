@@ -6,34 +6,34 @@ package rmnp
 
 var (
 	// StatSendBytes (atomic) counts the total amount of bytes send.
-	StatSendBytes uint64 = 0
+	StatSendBytes uint64
 
 	// StatReceivedBytes (atomic) counts the total amount of bytes received.
 	// Not the same as StatProcessedBytes because received packets may be discarded.
-	StatReceivedBytes uint64 = 0
+	StatReceivedBytes uint64
 
 	// StatProcessedBytes (atomic) counts the total size of all processed packets.
-	StatProcessedBytes uint64 = 0
+	StatProcessedBytes uint64
 )
 
 var (
 	// StatRunningGoRoutines (atomic) counts all currently active goroutines spawned by rmnp
-	StatRunningGoRoutines uint64 = 0
+	StatRunningGoRoutines uint64
 
 	// StatGoRoutinePanics (atomic) counts the amount of caught goroutine panics
-	StatGoRoutinePanics uint64 = 0
+	StatGoRoutinePanics uint64
 )
 
 var (
 	// StatConnects (atomic) counts all successful connects
-	StatConnects uint64 = 0
+	StatConnects uint64
 
 	// StatDeniedConnects (atomic) counts all denied connection attempts
-	StatDeniedConnects uint64 = 0
+	StatDeniedConnects uint64
 
 	// StatDisconnects (atomic) counts all disconnects
-	StatDisconnects uint64 = 0
+	StatDisconnects uint64
 
 	// StatTimeouts (atomic) counts all timeouts
-	StatTimeouts uint64 = 0
+	StatTimeouts uint64
 )
