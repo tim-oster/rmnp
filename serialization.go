@@ -46,7 +46,7 @@ func (s *Serializer) Bytes() []byte {
 	return s.buffer.Bytes()
 }
 
-// RemainingSize is the length of the serializer's buffer
+// RemainingSize is the buffer size minus the bytes that have already been read
 func (s *Serializer) RemainingSize() int {
 	return s.buffer.Len()
 }
