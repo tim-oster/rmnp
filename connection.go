@@ -24,13 +24,13 @@ const (
 type Channel byte
 
 const (
-	// ChannelUnreliable is fire and forget and unordered
+	// ChannelUnreliable is fast delivery without any guarantee on arrival or order
 	ChannelUnreliable Channel = iota
-	// ChannelUnreliableOrdered is fire and forget but sends in order
+	// ChannelUnreliableOrdered is the same as ChannelUnreliable but only the most recent packet is accepted
 	ChannelUnreliableOrdered
-	// ChannelReliable retries lost packets but is unordered
+	// ChannelReliable guarantees packets to arrive but not in order
 	ChannelReliable
-	// ChannelReliableOrdered retries lost packets but sends in order
+	// ChannelReliableOrdered guarantees packets to arrive in order (mimics TCP)
 	ChannelReliableOrdered
 )
 
