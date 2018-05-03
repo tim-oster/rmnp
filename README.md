@@ -33,6 +33,8 @@ go get github.com/obsilp/rmnp
 
 ### Basic Server
 
+[Example Pong Server](example/server.go)
+
 ```golang
 package main
 
@@ -47,6 +49,8 @@ func main() {
 ```
 
 ### Basic Client
+
+[Example Ping Client](example/client.go)
 
 ```golang
 package main
