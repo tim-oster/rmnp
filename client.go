@@ -84,9 +84,15 @@ func NewClient(server string) *Client {
 // If no connection can be established after CfgTimeoutThreshold milliseconds
 // Client.ServerTimeout is called.
 func (c *Client) Connect() {
+	c.ConnectWithData(nil)
+}
+
+// ConnectWithData does the same as Connect but also sends custom data to the server that can
+// be validated in the ClientValidation callback or during the ClientConnect callback.
+func (c *Client) ConnectWithData(data []byte) {
 	c.setSocket(net.DialUDP("udp", nil, c.address))
 	c.listen()
-	c.Server = c.connectClient(c.socket.RemoteAddr().(*net.UDPAddr))
+	c.Server = c.connectClient(c.socket.RemoteAddr().(*net.UDPAddr), data)
 }
 
 // Disconnect immediately disconnects from the server. It invokes no callbacks.

@@ -50,7 +50,7 @@ type WriteFunc func(*net.UDPConn, *net.UDPAddr, []byte)
 type disconnectType byte
 
 const (
-	disconnectTypeDefault disconnectType = iota
+	disconnectTypeDefault  disconnectType = iota
 	disconnectTypeShutdown
 	disconnectTypeTimeout
 )
@@ -204,7 +204,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 			return
 		}
 
-		connection = impl.connectClient(addr)
+		connection = impl.connectClient(addr, nil)
 	}
 
 	// done this way to ensure that connect callback is executed on client-side
@@ -228,7 +228,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	connection.receiveQueue.push(packet)
 }
 
-func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
+func (impl *protocolImpl) connectClient(addr *net.UDPAddr, data []byte) *Connection {
 	atomic.AddUint64(&StatConnects, 1)
 
 	hash := addrHash(addr)
@@ -240,7 +240,12 @@ func (impl *protocolImpl) connectClient(addr *net.UDPAddr) *Connection {
 	impl.connections[hash] = connection
 	impl.connectionsMutex.Unlock()
 
-	connection.sendLowLevelPacket(descReliable | descConnect)
+	if data != nil {
+		connection.sendHighLevelPacket(descReliable|descConnect, data)
+	} else {
+		connection.sendLowLevelPacket(descReliable | descConnect)
+	}
+
 	connection.startRoutines()
 
 	return connection
