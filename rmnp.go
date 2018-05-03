@@ -213,9 +213,9 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 			header := headerSize(packet)
 			invokeConnectionCallback(impl.onConnect, connection, packet[header:])
 			impl.connectGuard.finish(hash)
-		} else {
-			return
 		}
+
+		return
 	}
 
 	if descriptor(packet[5])&descDisconnect != 0 {
