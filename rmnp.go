@@ -211,6 +211,13 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	if descriptor(packet[5])&descConnect != 0 {
 		if connection.updateState(stateConnected) {
 			header := headerSize(packet)
+
+			// clear buffers so all remaining connection packets are deleted
+			if connection.IsServer {
+				connection.sendBuffer.reset()
+				connection.sendQueue.clear()
+			}
+
 			invokeConnectionCallback(impl.onConnect, connection, packet[header:])
 			impl.connectGuard.finish(hash)
 		}

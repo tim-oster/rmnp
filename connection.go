@@ -41,8 +41,9 @@ type Connection struct {
 	stateMutex sync.RWMutex
 	state      connectionState
 
-	Conn *net.UDPConn
-	Addr *net.UDPAddr
+	Conn     *net.UDPConn
+	Addr     *net.UDPAddr
+	IsServer bool
 
 	// for go routines
 	ctx          context.Context
@@ -107,6 +108,7 @@ func (c *Connection) reset() {
 
 	c.Conn = nil
 	c.Addr = nil
+	c.IsServer = false
 
 	c.orderedChain.reset()
 	c.sendBuffer.reset()

@@ -93,6 +93,7 @@ func (c *Client) ConnectWithData(data []byte) {
 	c.setSocket(net.DialUDP("udp", nil, c.address))
 	c.listen()
 	c.Server = c.connectClient(c.socket.RemoteAddr().(*net.UDPAddr), data)
+	c.Server.IsServer = true
 }
 
 // Disconnect immediately disconnects from the server. It invokes no callbacks.
