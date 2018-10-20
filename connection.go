@@ -531,7 +531,7 @@ func (c *Connection) GetFallback(key byte, fallback interface{}) interface{} {
 // Del deletes a stored value from this connection instance.
 // It is thread safe.
 func (c *Connection) Del(key byte) {
-	c.valuesMutex.RLock()
-	defer c.valuesMutex.RUnlock()
+	c.valuesMutex.Lock()
+	defer c.valuesMutex.Unlock()
 	delete(c.values, key)
 }
