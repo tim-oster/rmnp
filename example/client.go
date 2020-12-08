@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/obsilp/rmnp"
 	"fmt"
+	"rmnp"
 )
 
 func main() {
@@ -32,5 +32,5 @@ func serverTimeout(conn *rmnp.Connection, data []byte) {
 }
 
 func handleClientPacket(conn *rmnp.Connection, data []byte, channel rmnp.Channel) {
-	fmt.Println("'" + string(data) + "'", "on channel", channel)
+	fmt.Println("'"+string(data)+"'", "on channel", channel)
 }

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/obsilp/rmnp"
-	"net"
 	"fmt"
+	"net"
+	"rmnp"
 )
 
 func main() {
