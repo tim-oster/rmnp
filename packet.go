@@ -6,7 +6,7 @@ package rmnp
 
 import (
 	"encoding/binary"
-	"hash/crc32"
+	"github.com/OneOfOne/xxhash"
 )
 
 type sequenceNumber uint16
@@ -24,7 +24,7 @@ const (
 
 type packet struct {
 	protocolID byte
-	crc32      uint32
+	xxh        uint64
 	descriptor descriptor
 
 	// only contained in Reliable or Unreliable Ordered packets
@@ -45,7 +45,7 @@ func (p *packet) serialize() []byte {
 	s := NewSerializer()
 
 	s.Write(p.protocolID)
-	s.Write(p.crc32)
+	s.Write(p.xxh)
 	s.Write(p.descriptor)
 
 	if p.flag(descReliable) || p.flag(descOrdered) {
@@ -73,7 +73,7 @@ func (p *packet) deserialize(packet []byte) bool {
 
 	// head is valid (validated before data processing)
 	s.Read(&p.protocolID)
-	s.Read(&p.crc32)
+	s.Read(&p.xxh)
 	s.Read(&p.descriptor)
 
 	if p.flag(descReliable) || p.flag(descOrdered) {
@@ -107,9 +107,9 @@ func (p *packet) deserialize(packet []byte) bool {
 }
 
 func (p *packet) calculateHash() {
-	p.crc32 = 0
+	p.xxh = 0
 	buffer := p.serialize()
-	p.crc32 = crc32.ChecksumIEEE(buffer)
+	p.xxh = xxhash.Checksum64(buffer)
 }
 
 func (p *packet) flag(flag descriptor) bool {
@@ -117,8 +117,8 @@ func (p *packet) flag(flag descriptor) bool {
 }
 
 func validateHeader(packet []byte) bool {
-	// 1b protocolId + 4b crc32 + 1b descriptor
-	if len(packet) < 6 {
+	// 1b protocolId + 8b xxh + 1b descriptor
+	if len(packet) < 10 {
 		return false
 	}
 
@@ -130,17 +130,17 @@ func validateHeader(packet []byte) bool {
 		return false
 	}
 
-	hash1 := binary.LittleEndian.Uint32(packet[1:5])
-	hash2 := crc32.ChecksumIEEE(append([]byte{packet[0], 0, 0, 0, 0}, packet[5:]...))
+	hash1 := binary.LittleEndian.Uint64(packet[1:9])
+	hash2 := xxhash.Checksum64(append([]byte{packet[0], 0, 0, 0, 0, 0, 0, 0, 0}, packet[9:]...))
 	return hash1 == hash2
 }
 
 func headerSize(packet []byte) int {
-	desc := descriptor(packet[5])
+	desc := descriptor(packet[9])
 	size := 0
 
-	// protocolId (1) + crc (4) + descriptor (1)
-	size += 6
+	// protocolId (1) + xxh (8) + descriptor (1)
+	size += 10
 
 	if desc&descReliable != 0 || desc&descOrdered != 0 {
 		// sequence (2)

@@ -7,7 +7,7 @@ package rmnp
 import (
 	"encoding/binary"
 	"fmt"
-	"hash/crc32"
+	"github.com/OneOfOne/xxhash"
 	"net"
 	"sync/atomic"
 	"time"
@@ -34,9 +34,9 @@ func antiPanic(callback func()) {
 	}
 }
 
-func addrHash(addr *net.UDPAddr) uint32 {
+func addrHash(addr *net.UDPAddr) uint64 {
 	port := cnvUint32(uint32(addr.Port))
-	return crc32.ChecksumIEEE(append(addr.IP, port...))
+	return xxhash.Checksum64(append(addr.IP, port...))
 }
 
 func cnvUint32(i uint32) []byte {

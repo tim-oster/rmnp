@@ -7,12 +7,12 @@ package rmnp
 import "testing"
 
 var testPacketDescriptors = map[descriptor]int{
-	0:                          6,
-	descReliable:               8,
-	descOrdered:                8,
-	descReliable | descOrdered: 9,
-	descAck:                    12,
-	descReliable | descOrdered | descAck: 15,
+	0:                                    10,
+	descReliable:                         12,
+	descOrdered:                          12,
+	descReliable | descOrdered:           13,
+	descAck:                              16,
+	descReliable | descOrdered | descAck: 19,
 }
 
 var testPacketDescriptorPermutations = []descriptor{
@@ -28,7 +28,7 @@ var testPacketDescriptorPermutations = []descriptor{
 func newTestPacket() *packet {
 	return &packet{
 		protocolID: CfgProtocolID,
-		crc32:      244,
+		xxh:        244,
 		descriptor: descReliable | descAck | descOrdered,
 		sequence:   10,
 		order:      5,
@@ -49,8 +49,8 @@ func TestPacketSerialization(t *testing.T) {
 		t.Error("packet.protocolId not correctly serialized")
 	}
 
-	if d.crc32 != s.crc32 {
-		t.Error("packet.crc32 not correctly serialized")
+	if d.xxh != s.xxh {
+		t.Error("packet.xxh not correctly serialized")
 	}
 
 	if d.descriptor != s.descriptor {
@@ -91,7 +91,7 @@ func TestPacketHash(t *testing.T) {
 	p1.calculateHash()
 	p2.calculateHash()
 
-	if p1.crc32 != p2.crc32 {
+	if p1.xxh != p2.xxh {
 		t.Error("Packet hashes or not equal")
 	}
 }
@@ -118,7 +118,7 @@ func TestPacketValidateHeader(t *testing.T) {
 		t.Error("Valid packet cannot be validated")
 	}
 
-	if validateHeader(d[0:5]) {
+	if validateHeader(d[0:9]) {
 		t.Error("Wrong min length for fixed header")
 	}
 

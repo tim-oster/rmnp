@@ -50,7 +50,7 @@ type WriteFunc func(*net.UDPConn, *net.UDPAddr, []byte)
 type disconnectType byte
 
 const (
-	disconnectTypeDefault  disconnectType = iota
+	disconnectTypeDefault disconnectType = iota
 	disconnectTypeShutdown
 	disconnectTypeTimeout
 )
@@ -65,7 +65,7 @@ type protocolImpl struct {
 
 	connectGuard     *execGuard
 	connectionsMutex sync.RWMutex
-	connections      map[uint32]*Connection
+	connections      map[uint64]*Connection
 	readFunc         ReadFunc
 	writeFunc        WriteFunc
 
@@ -87,7 +87,7 @@ func (impl *protocolImpl) init(address string) {
 
 	impl.address = addr
 	impl.connectGuard = newExecGuard()
-	impl.connections = make(map[uint32]*Connection)
+	impl.connections = make(map[uint64]*Connection)
 
 	impl.bufferPool = sync.Pool{
 		New: func() interface{} { return make([]byte, CfgMTU) },
@@ -190,7 +190,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	impl.connectionsMutex.RUnlock()
 
 	if !exists {
-		if descriptor(packet[5])&descConnect == 0 {
+		if descriptor(packet[9])&descConnect == 0 {
 			return
 		}
 
@@ -208,7 +208,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 	}
 
 	// done this way to ensure that connect callback is executed on client-side
-	if descriptor(packet[5])&descConnect != 0 {
+	if descriptor(packet[9])&descConnect != 0 {
 		if connection.updateState(stateConnected) {
 			header := headerSize(packet)
 
@@ -225,7 +225,7 @@ func (impl *protocolImpl) handlePacket(addr *net.UDPAddr, packet []byte) {
 		return
 	}
 
-	if descriptor(packet[5])&descDisconnect != 0 {
+	if descriptor(packet[9])&descDisconnect != 0 {
 		header := headerSize(packet)
 		impl.disconnectClient(connection, disconnectTypeDefault, packet[header:])
 		return
