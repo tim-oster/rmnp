@@ -7,7 +7,7 @@ modern realtime games like first person shooters. It is basically an extension f
 
 - Connections (with timeouts and ping calculation)
 - Error detection
-- Small overhead (max 15 bytes for header)
+- Small overhead (max 19 bytes for header)
 - Simple congestion control (avoids flooding nodes between sender/receiver)
 - Optional reliable and ordered packet delivery
 
@@ -17,7 +17,7 @@ The bad thing about TCP is that once a packet is dropped it stops sending all ot
 This can be a huge problem for games that are time sensitive because it is not uncommon for devices to encounter
 packet-loss. Therefore RMNP facilitates UDP to guarantee fast delivery without any restrictions. Because UDP is stateless
 RMNP implements an easy way to handle connection and to distinguish between "connected" clients. Every packet contains a small
-header mainly containing a CRC32 hash to ensure that all received packets were transmitted correctly.
+header mainly containing an XXH hash to ensure that all received packets were transmitted correctly.
 
 To guarantee reliability the receiver sends acknowledgment packets back to tell the sender which packets it received. The sender
 resends each packet until it received an acknowledgment or the maximum timeout is reached. Because of that RMNP is not 100% reliable
